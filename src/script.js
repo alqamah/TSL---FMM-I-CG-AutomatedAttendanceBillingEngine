@@ -152,7 +152,7 @@ async function processFile(file) {
                     'Duty-Out': formattedDutyOut === undefined ? 'N/A' : formattedDutyOut,
                     'Duty-Hours': calc.dutyHours === undefined ? 'N/A' : calc.dutyHours,
                     'OT-Hours': calc.otHours === undefined ? 'N/A' : calc.otHours,
-                    'TOTAL-WORKING-HOURS': calc.netHours === undefined ? 'N/A' : calc.netHours,
+                    'NET-HOURS': calc.netHours === undefined ? 'N/A' : calc.netHours,
                 };
             });
 
@@ -208,8 +208,10 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr) {
 
     // If outTime is smaller, it crossed midnight (next day)
     let diffMins = dutyOutMins - dutyInMins;
-    if (diffMins < 0) {
+    if (outMins < inMins) {
         diffMins += 24 * 60;
+    } else if (diffMins < 0) {
+        diffMins = 0;
     }
 
     let totalHours = diffMins / 60;
@@ -219,7 +221,7 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr) {
     let otHours = totalHours > 8 ? totalHours - 8 : 0;
     let dutyHours = totalHours - otHours;
 
-    if (dutyOutMins - dutyInMins < 30) {
+    if (diffMins < 30) {
         netHours = 0;
         otHours = 0;
         dutyHours = 0;
@@ -319,7 +321,7 @@ function renderTable() {
             <td>${row['Duty-Out']}</td>
             <td>${row['Duty-Hours']}</td>
             <td>${row['OT-Hours']}</td>
-            <td class="highlight-hours">${row['TOTAL-WORKING-HOURS']}</td>
+            <td class="highlight-hours">${row['NET-HOURS']}</td>
         `;
         tableBody.appendChild(tr);
     });

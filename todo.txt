@@ -1,3 +1,7 @@
 Fix shift allocation for w1. 
 Add search bar
 Add download btn
+
+correct the logic for night shift
+wrong output 
+32	03-02-2026	VD0722561172	RUPESH KUMAR	B445	U			18:34	06:02	19:00	06:00	0	0	0
