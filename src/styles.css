@@ -36,7 +36,6 @@ body {
     background-color: var(--bg-base);
     color: var(--text-primary);
     line-height: 1.5;
-    position: relative;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -48,8 +47,6 @@ body {
     display: flex;
     flex-direction: column;
     gap: 2rem;
-    position: relative;
-
 }
 
 /* Header */
@@ -231,9 +228,8 @@ body {
     background-color: var(--bg-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    overflow-x: auto;
-    overflow-y: auto;
     box-shadow: var(--shadow-sm);
+    /* overflow: auto; */
 }
 
 table {
@@ -241,21 +237,21 @@ table {
     border-collapse: collapse;
     text-align: left;
     font-size: 0.875rem;
-    position: sticky;
-    top: 0;
-    z-index: 10;
+    background-color: black;
+    border-radius: 10px;
 }
 
 thead th {
     position: sticky;
     top: 0;
     z-index: 10;
-    background-color: var(--bg-base);
+    background-color: white;
     /* Used a solid background to prevent transparency overlap when scrolling */
     padding: 1rem;
     font-weight: 600;
-    color: var(--text-secondary);
-    border-bottom: 1px solid var(--border-color);
+    color: black;
+    border-bottom: 2px solid var(--border-color);
+    border-right: 1px solid var(--border-color);
     white-space: nowrap;
 
 }
@@ -287,6 +283,6 @@ tbody tr:hover:not(.empty-state-row) {
 
 .highlight-hours {
     font-weight: 600;
-    color: #4ade80;
+    color: #71de4a;
     /* bright green for parsed hours */
 }

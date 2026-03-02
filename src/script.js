@@ -210,12 +210,18 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr) {
         diffMins += 24 * 60;
     }
 
-    const totalHours = diffMins / 60;
+    let totalHours = diffMins / 60;
 
     // Lunch hour is not to be calculated by the app's end, so netHours = totalHours
-    const netHours = totalHours;
-    const otHours = totalHours > 8 ? totalHours - 8 : 0;
-    const dutyHours = totalHours - otHours;
+    let netHours = totalHours;
+    let otHours = totalHours > 8 ? totalHours - 8 : 0;
+    let dutyHours = totalHours - otHours;
+
+    if(dutyOutMins-dutyInMins<30){
+        netHours = 0;
+        otHours = 0;
+        dutyHours = 0;
+    }
 
     return {
         dutyInMins,
