@@ -36,6 +36,7 @@ body {
     background-color: var(--bg-base);
     color: var(--text-primary);
     line-height: 1.5;
+    position: relative;
     -webkit-font-smoothing: antialiased;
 }
 
@@ -47,6 +48,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 2rem;
+    position: relative;
+
 }
 
 /* Header */
@@ -229,6 +232,7 @@ body {
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     overflow-x: auto;
+    overflow-y: auto;
     box-shadow: var(--shadow-sm);
 }
 
@@ -237,19 +241,23 @@ table {
     border-collapse: collapse;
     text-align: left;
     font-size: 0.875rem;
-    position: relative;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 thead th {
-    background-color: rgba(15, 23, 42, 0.5);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background-color: var(--bg-base);
+    /* Used a solid background to prevent transparency overlap when scrolling */
     padding: 1rem;
     font-weight: 600;
     color: var(--text-secondary);
     border-bottom: 1px solid var(--border-color);
     white-space: nowrap;
-    position: sticky;
-    top: 0;
-    z-index: 1;
+
 }
 
 tbody td {
