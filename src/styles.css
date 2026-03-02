@@ -237,6 +237,7 @@ table {
     border-collapse: collapse;
     text-align: left;
     font-size: 0.875rem;
+    position: relative;
 }
 
 thead th {
@@ -246,6 +247,9 @@ thead th {
     color: var(--text-secondary);
     border-bottom: 1px solid var(--border-color);
     white-space: nowrap;
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 
 tbody td {

@@ -119,9 +119,9 @@ async function processFile(file) {
                 const outTime = outMins !== null ? formatMinutesTo24h(outMins) : outTimeRaw;
 
                 let shift = String(row['Shift'] || '').trim();
-                if (shift === 'G') {
-                    shift = null;
-                }
+                // if (shift === 'G') {
+                //     shift = null;
+                // }
 
                 let shiftIn = '';
                 let shiftOut = '';
@@ -146,9 +146,11 @@ async function processFile(file) {
                     'Shift-Out': shiftOut,
                     'In-Time': inTime,
                     'Out-Time': outTime,
-                    'dutyIn': formattedDutyIn,
-                    'dutyOut': formattedDutyOut,
-                    'Working Hours': calc.netHours
+                    'Duty-In': formattedDutyIn,
+                    'Duty-Out': formattedDutyOut,
+                    'Duty-Hours': calc.dutyHours,
+                    'OT-Hours': calc.otHours,
+                    'TOTAL-WORKING-HOURS': calc.netHours,
                 };
             });
 
@@ -166,7 +168,7 @@ async function processFile(file) {
         statusItem.querySelector('.status-text').textContent = 'Failed';
     }
 }
-
+//hours calc fn
 function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr) {
     if (!inTimeStr || !outTimeStr || String(inTimeStr).toLowerCase() === 'off' || String(outTimeStr).toLowerCase() === 'off') {
         return { dutyInMins: null, dutyOutMins: null, netHours: 0 };
@@ -184,18 +186,23 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr) {
     let dutyInMins = inMins;
     let dutyOutMins = outMins;
 
-    if (shiftStr === 'C') {
-        dutyInMins = Math.ceil(inMins / 30) * 30;
-        dutyOutMins = Math.floor(outMins / 30) * 30;
-    } else if (shiftInMins !== null) {
-        if (inMins <= shiftInMins + 15) {
-            dutyInMins = shiftInMins;
-        } else {
-            dutyInMins = Math.ceil(inMins / 30) * 30;
-        }
+    // if (shiftStr === 'C') {
+    //     dutyInMins = Math.ceil(inMins / 30) * 30;
+    //     dutyOutMins = Math.floor(outMins / 30) * 30;
+    // } else if (shiftInMins !== null) {
+    //     if (inMins <= shiftInMins + 15) {
+    //         dutyInMins = shiftInMins;
+    //     } else {
+    //         dutyInMins = Math.ceil(inMins / 30) * 30;
+    //     }
 
-        dutyOutMins = Math.floor(outMins / 30) * 30;
-    }
+    //     dutyOutMins = Math.floor(outMins / 30) * 30;
+    // }
+    if (shiftInMins !== null && inMins > shiftInMins && inMins <= shiftInMins + 15)
+        dutyInMins = shiftInMins;
+    else
+        dutyInMins = Math.ceil(inMins / 30) * 30;
+    dutyOutMins = Math.floor(outMins / 30) * 30;
 
     // If outTime is smaller, it crossed midnight (next day)
     let diffMins = dutyOutMins - dutyInMins;
@@ -207,11 +214,15 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr) {
 
     // Lunch hour is not to be calculated by the app's end, so netHours = totalHours
     const netHours = totalHours;
+    const otHours = totalHours > 8 ? totalHours - 8 : 0;
+    const dutyHours = totalHours - otHours;
 
     return {
         dutyInMins,
         dutyOutMins,
-        netHours: parseFloat(netHours.toFixed(2))
+        netHours: parseFloat(netHours.toFixed(2)),
+        otHours: parseFloat(otHours.toFixed(2)),
+        dutyHours: parseFloat(dutyHours.toFixed(2))
     };
 }
 
@@ -275,9 +286,11 @@ function renderTable() {
             <td>${row['Shift-Out']}</td>
             <td>${row['In-Time']}</td>
             <td>${row['Out-Time']}</td>
-            <td>${row['dutyIn']}</td>
-            <td>${row['dutyOut']}</td>
-            <td class="highlight-hours">${row['Working Hours']}</td>
+            <td>${row['Duty-In']}</td>
+            <td>${row['Duty-Out']}</td>
+            <td>${row['Duty-Hours']}</td>
+            <td>${row['OT-Hours']}</td>
+            <td class="highlight-hours">${row['TOTAL-WORKING-HOURS']}</td>
         `;
         tableBody.appendChild(tr);
     });
@@ -300,9 +313,11 @@ function exportToExcel() {
         { wch: 10 }, // Shift-Out
         { wch: 10 }, // In
         { wch: 10 }, // Out
-        { wch: 10 }, // dutyIn
-        { wch: 10 }, // dutyOut
-        { wch: 15 }  // Working Hours
+        { wch: 10 }, // Duty-In
+        { wch: 10 }, // Duty-Out
+        { wch: 10 }, // Duty-Hours
+        { wch: 10 }, // OT-Hours
+        { wch: 22 }  // TOTAL-WORKING-HOURS
     ];
     worksheet['!cols'] = colWidths;
 
