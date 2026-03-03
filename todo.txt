@@ -1,1 +1,11 @@
 Fix shift allocation for w1. 
+
+Drivers:
+//Chottu Lohar
+
+1. Sujit Kr. Vishwakarma
+2. Nalin Mahato
+3. Rupesh Kumar
+4. Laxman Bhaduk
+5. Raju Kalindi
+6. Nipen Ch. Shukul
