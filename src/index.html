@@ -40,16 +40,42 @@
             <section class="upload-section">
                 <div class="upload-card">
                     <div class="upload-icon">
-                        <svg stroke="currentColor" fill="none" stroke-width="1.5" viewBox="0 0 24 24"
+                        <!-- <svg stroke="currentColor" fill="none" stroke-width="1.5" viewBox="0 0 24 24"
                             stroke-linecap="round" stroke-linejoin="round" height="42" width="42"
                             xmlns="http://www.w3.org/2000/svg">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                             <line x1="12" y1="8" x2="12" y2="16"></line>
                             <line x1="8" y1="12" x2="16" y2="12"></line>
-                        </svg>
+                        </svg> -->
+                                                    <svg 
+                            stroke="currentColor" 
+                            fill="none" 
+                            stroke-width="1.5" 
+                            viewBox="0 0 24 24" 
+                            stroke-linecap="round" 
+                            stroke-linejoin="round" 
+                            height="42" 
+                            width="42" 
+                            xmlns="http://www.w3.org/2000/svg"
+                            >
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            
+                            <text 
+                                x="12" 
+                                y="12.5" 
+                                font-family="system-ui, -apple-system, sans-serif" 
+                                font-size="6" 
+                                font-weight="700" 
+                                text-anchor="middle" 
+                                dominant-baseline="middle" 
+                                fill="currentColor" 
+                                stroke="none"
+                            >
+                                CLM
+                            </text>
+                            </svg>
                     </div>
-                    <h2>Upload Spreadsheets</h2>
-                    <p>Select multiple .xls files to process and calculate working hours.</p>
+                    <h2>Upload CLM Files (XLS)</h2>
                     <label for="fileInput" class="btn btn-outline">Browse Files</label>
                     <input type="file" id="fileInput" accept=".xls,.xlsx" multiple hidden>
                 </div>
