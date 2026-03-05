@@ -18,3 +18,6 @@ Drivers:
 6. Nipen Ch. Shukul - RW0807096365
 
 Perform search only on Name, ID and Date
+
+v3.0
+05/03: shift allocation logic for drivers is not working for C Shift + OT. Need to hardcode the shift allocation for C shift wrt duty in-out time.

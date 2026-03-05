@@ -267,7 +267,6 @@ function formatMinutesTo24h(totalMinutes) {
 }
 
 // Date normalization function 
-// Normalizes various formats string to DD-MM-YYYY or DD-MMM-YYYY based on needs
 function normalizeDate(dateStr) {
     if (!dateStr) return 'N/A';
 
@@ -319,14 +318,14 @@ function renderTable() {
             <td>${row['Date']}</td>
             <td>${row['Safety Pass No']}</td>
             <td>${row['Employee Name']}</td>
-            <td>${row['Vendor Code']}</td>
+            <!-- <td>${row['Vendor Code']}</td> -->
             <td>${row['Shift']}</td>
             <td>${row['Shift-In']}</td>
             <td>${row['Shift-Out']}</td>
             <td>${row['In-Time']}</td>
             <td>${row['Out-Time']}</td>
-            <td>${row['Duty-In']}</td>
-            <td>${row['Duty-Out']}</td>
+            <!-- <td>${row['Duty-In']}</td> -->
+            <!-- <td>${row['Duty-Out']}</td> -->
             <td>${row['Duty-Hours']}</td>
             <td>${row['OT-Hours']}</td>
             <td class="highlight-hours">${row['NET-HOURS']}</td>
@@ -335,31 +334,11 @@ function renderTable() {
     });
 }
 
+//excel export fn
 function exportToExcel() {
     if (allProcessedData.length === 0) return;
 
     const worksheet = XLSX.utils.json_to_sheet(allProcessedData);
-
-    // Optional: Auto-size columns slightly
-    const colWidths = [
-        { wch: 8 },  // SL NO
-        { wch: 12 }, // Date
-        { wch: 15 }, // ID
-        { wch: 25 }, // Name
-        { wch: 10 }, // VC
-        { wch: 6 },  // Shift
-        { wch: 10 }, // Shift-In
-        { wch: 10 }, // Shift-Out
-        { wch: 10 }, // In
-        { wch: 10 }, // Out
-        { wch: 10 }, // Duty-In
-        { wch: 10 }, // Duty-Out
-        { wch: 10 }, // Duty-Hours
-        { wch: 10 }, // OT-Hours
-        { wch: 22 }  // TOTAL-WORKING-HOURS
-    ];
-    worksheet['!cols'] = colWidths;
-
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Processed Attendance");
 
