@@ -8,24 +8,19 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 
 <body>
-    <div class="ambient-glow glow-1"></div>
-    <div class="ambient-glow glow-2"></div>
-
     <div class="app-container">
         <header class="header">
             <div class="header-content">
                 <div class="logo-group">
                     <div class="logo-accent"></div>
-                    <h1>WORKING_HOURS_CALC</h1>
+                    <h1>Working Hours Calculator</h1>
                 </div>
-                <p>Compile shift metrics from `.xls` vendor attendance exports.</p>
+                <p>Compile shift metrics from .xls vendor attendance exports.</p>
             </div>
             <div class="header-actions">
                 <button id="exportBtn" class="btn btn-primary" disabled>
@@ -35,7 +30,7 @@
                         <polyline points="7 10 12 15 17 10"></polyline>
                         <line x1="12" y1="15" x2="12" y2="3"></line>
                     </svg>
-                    <span>DOWNLOAD .XLSX</span>
+                    <span>Export XLSX</span>
                 </button>
             </div>
         </header>
@@ -52,9 +47,9 @@
                             <line x1="8" y1="12" x2="16" y2="12"></line>
                         </svg>
                     </div>
-                    <h2>SYSTEM.UPLOAD</h2>
-                    <p>Select multiple `.xls` files to process and calculate working hours.</p>
-                    <label for="fileInput" class="btn btn-outline">BROWSE SYSTEM</label>
+                    <h2>Upload Spreadsheets</h2>
+                    <p>Select multiple .xls files to process and calculate working hours.</p>
+                    <label for="fileInput" class="btn btn-outline">Browse Files</label>
                     <input type="file" id="fileInput" accept=".xls,.xlsx" multiple hidden>
                 </div>
             </section>
@@ -62,8 +57,8 @@
             <section class="status-section" id="statusSection" style="display: none;">
                 <div class="status-card">
                     <div class="status-header">
-                        <h3>PROCESSING THREADS</h3>
-                        <span id="fileCountBadge" class="badge">0 FILES</span>
+                        <h3>File Processing</h3>
+                        <span id="fileCountBadge" class="badge">0 files</span>
                     </div>
                     <ul id="fileStatusList" class="status-list">
                     </ul>
@@ -79,7 +74,7 @@
                             <circle cx="11" cy="11" r="8"></circle>
                             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                         </svg>
-                        <input type="text" id="searchInput" placeholder="QUERY NAME, PASS, VENDOR, OR SHIFT...">
+                        <input type="text" id="searchInput" placeholder="Search by name, pass, vendor, or shift...">
                     </div>
                 </div>
 
@@ -117,7 +112,7 @@
                                                 <polyline points="2 12 12 17 22 12"></polyline>
                                             </svg>
                                         </div>
-                                        <p>AWAITING DATA INPUT</p>
+                                        <p>No data available</p>
                                     </div>
                                 </td>
                             </tr>

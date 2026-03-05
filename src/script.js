@@ -121,9 +121,9 @@ async function processFile(file) {
                 const outTime = outMins !== null ? formatMinutesTo24h(outMins) : outTimeRaw;
 
                 let shift = String(row['Shift'] || '').trim().toUpperCase();
-                // if (shift === 'G') {
-                //     shift = null;
-                // }
+                const employeeId = String(row['Safety Pass No'] || '').trim();
+
+                shift = assignShift(employeeId, shift);
 
                 let shiftIn = '';
                 let shiftOut = '';
@@ -234,6 +234,14 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr) {
         otHours: parseFloat(otHours.toFixed(2)),
         dutyHours: parseFloat(dutyHours.toFixed(2))
     };
+}
+
+// assigns shift - for assigning custom shift to Drivers
+function assignShift(employeeId, currentShift) {
+    if (!DRIVERS.includes(employeeId) && currentShift === 'G') {
+        return 'W1';
+    }
+    return currentShift;
 }
 
 // Converts standard "hh:mm AM/PM" format to minutes since midnight
