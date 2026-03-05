@@ -52,6 +52,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 3rem;
+    position: relative;
 }
 
 /* Header */
@@ -282,12 +283,14 @@ body {
 
 /* Table */
 .table-container {
+    position: static;
     background-color: var(--bg-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
+    width: 95vw;
     overflow-x: auto;
     overflow-y: auto;
-    max-height: 60vh;
+    max-height: 80vh;
 }
 
 table {
