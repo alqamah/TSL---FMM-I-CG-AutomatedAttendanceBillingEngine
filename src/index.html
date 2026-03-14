@@ -103,6 +103,12 @@
                         </svg>
                         <input type="text" id="searchInput" placeholder="Search by name, pass, vendor, or shift...">
                     </div>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
+                        <input type="checkbox" id="addLunchCheckbox" style="width: 20px; height: 20px;">
+                        Add Lunch
+                    </label>
+                    <button id="btnEmployeeTotal" class="stat-button" onclick="employeewiseTotalHours()" style="display: none;">Employee Total</button>
+                    <button id="btnSkillTotal" class="stat-button" onclick="skillwiseTotalHours()" style="display: none;">Skill Total</button>
                 </div>
 
                 <div class="table-container">
@@ -113,6 +119,7 @@
                                 <th>DATE</th>
                                 <th>PASS NO</th>
                                 <th>EMPLOYEE NAME</th>
+                                <th>SKILL LEVEL</th>
                                 <!-- <th>VENDOR</th> -->
                                 <th>SHIFT</th>
                                 <th>IN</th>

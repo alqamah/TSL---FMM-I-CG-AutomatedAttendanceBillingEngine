@@ -312,6 +312,30 @@ body {
 .data-controls {
     display: flex;
     margin-bottom: 1.5rem;
+    gap: 1rem;
+    align-items: stretch;
+}
+
+.stat-button {
+    background-color: var(--bg-surface);
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 1rem 1.5rem;
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    font-size: 1.125rem;
+    font-weight: 600;
+    outline: none;
+    box-shadow: var(--shadow-neubrutal);
+    transition: var(--transition-neubrutal);
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.stat-button:hover {
+    box-shadow: var(--shadow-neubrutal-hover);
+    transform: translateY(2px) translateX(2px);
+    background-color: #FFFDF0;
 }
 
 .search-box {
@@ -368,7 +392,7 @@ table {
     border-collapse: separate;
     border-spacing: 0;
     text-align: left;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     position: sticky;
     top: 100px;
 }
@@ -378,12 +402,11 @@ thead th {
     top: 0;
     z-index: 10;
     background-color: var(--primary-color);
-    padding: 1.25rem 1rem;
+    padding: 0 1rem;
     font-weight: 700;
     color: var(--text-primary);
     border-bottom: var(--border-width) solid var(--border-color);
     border-right: var(--border-width-sm) solid var(--border-color);
-    white-space: nowrap;
     text-transform: uppercase;
 }
 
@@ -397,7 +420,7 @@ thead th:last-child {
 }
 
 tbody td {
-    padding: 1.25rem 1rem;
+    padding: .75rem 1rem;
     border-bottom: var(--border-width-sm) solid var(--border-color);
     border-right: var(--border-width-sm) solid var(--border-color);
     color: var(--text-primary);
@@ -414,9 +437,9 @@ tbody tr:last-child td {
     border-bottom: none;
 }
 
-tbody tr:nth-child(even) td {
+/* tbody tr:nth-child(even) td {
     background-color: var(--bg-surface-alt);
-}
+} */
 
 tbody tr:hover td {
     background-color: #FEF3C7;
@@ -454,6 +477,28 @@ tbody tr:hover td {
     color: #326528;
     text-shadow: 1px 1px 0px #454545;
 }
+
+tbody td:nth-child(2),
+tbody td:nth-child(4),
+tbody td:nth-child(9),
+tbody td:nth-child(10),
+tbody td:nth-last-child {
+    background-color: green;
+}
+
+tbody td:nth-child(4) {
+    background-color: rgb(227, 255, 250);
+}
+tbody td:nth-child(9) {
+    background-color: rgb(227, 255, 228);
+}
+tbody td:nth-child(10) {
+    background-color: rgb(255, 227, 227);
+}
+
+/* tbody tr:nth-child(even) td {
+    background-color: var(--bg-surface-alt);
+} */
 
 /* Animations */
 @keyframes slideDown {
