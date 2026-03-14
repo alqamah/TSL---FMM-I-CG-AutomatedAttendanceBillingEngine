@@ -16,6 +16,7 @@ fileInput.addEventListener('change', handleFileSelect);
 exportBtn.addEventListener('click', exportToExcel);
 if (searchInput) searchInput.addEventListener('input', renderTable);
 
+//file upload
 async function handleFileSelect(event) {
     const files = Array.from(event.target.files);
     if (!files.length) return;
@@ -41,6 +42,7 @@ async function handleFileSelect(event) {
     }
 }
 
+//file processing
 async function processFile(file) {
     const statusItem = document.createElement('li');
     statusItem.className = 'status-item';
@@ -170,6 +172,7 @@ async function processFile(file) {
         statusItem.querySelector('.status-text').textContent = 'Failed';
     }
 }
+//----------------------------------------
 //hours calc fn
 function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr) {
     if (!inTimeStr || !outTimeStr || String(inTimeStr).toLowerCase() === 'off' || String(outTimeStr).toLowerCase() === 'off') {
@@ -244,6 +247,7 @@ function assignShift(employeeId, currentShift) {
     return currentShift;
 }
 
+//----------------------------------------
 // Converts standard "hh:mm AM/PM" format to minutes since midnight
 function parseTimeFormatToMinutes(timeStr) {
     const timeMatch = String(timeStr).trim().match(/^(\d{1,2})[.:]?(\d{2})?\s*([aApP][mM])?$/);
@@ -284,6 +288,8 @@ function normalizeDate(dateStr) {
     return clean;
 }
 
+//----------------------------------------
+// Render table function
 function renderTable() {
     if (allProcessedData.length === 0) return;
 
