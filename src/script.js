@@ -217,12 +217,18 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, addLunch) {
 
     //     dutyOutMins = Math.floor(outMins / 30) * 30;
     // }
+
+
+    // this part needs further improvement in logic based on the designation and shifts allowed. 
+    //early/late in; early/late out; in/out present/na; ot applicable based on the designation 
+    
     if (shiftInMins !== null && inMins > shiftInMins && inMins <= shiftInMins + 15)
         dutyInMins = shiftInMins;
     else{
-        if (shiftInMins-inMins>59)
+        if ((shiftInMins-inMins>59) || (shiftInMins == null))
             dutyInMins = Math.ceil(inMins / 30) * 30;
-        dutyInMins = shiftInMins;
+        else
+            dutyInMins = shiftInMins;
     }
     dutyOutMins = Math.floor(outMins / 30) * 30;
 
