@@ -13,7 +13,7 @@
     --border-color: #000000;
     --border-width: 3px;
     --border-width-sm: 2px;
-    --border-highlight: #000000;
+    --border-highlight: #ffbdbd;
 
     --primary-color: #FFD166;
     /* Vibrant Yellow */
@@ -59,7 +59,7 @@ body {
     color: var(--text-primary);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
+    overflow-x: auto;
     /* subtle background pattern could be added here */
     background-image: radial-gradient(#d3d3d3 1px, transparent 1px);
     background-size: 20px 20px;
@@ -395,14 +395,15 @@ table {
     font-size: 0.85rem;
     position: sticky;
     top: 100px;
+    text-transform: uppercase;
 }
 
 thead th {
     position: sticky;
     top: 0;
     z-index: 10;
-    background-color: var(--primary-color);
-    padding: 0 1rem;
+    background-color: #cceee8;
+    padding: 1rem 1rem;
     font-weight: 700;
     color: var(--text-primary);
     border-bottom: var(--border-width) solid var(--border-color);
@@ -415,8 +416,36 @@ thead th:last-child {
 }
 
 .highlight-header {
-    background-color: var(--accent-color);
+    background-color: #625185;
     color: white;
+}
+
+.sortable-header {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sortable-header:hover {
+    background-color: #b0ddd5;
+}
+
+.sort-arrows {
+    display: inline-flex;
+    flex-direction: column;
+    margin-left: 4px;
+    line-height: 0.6;
+    vertical-align: middle;
+    font-size: 0.6rem;
+}
+
+.sort-arrow {
+    opacity: 0.3;
+    transition: opacity 150ms ease;
+}
+
+.sort-arrow.active {
+    opacity: 1;
+    color: #625185;
 }
 
 tbody td {
@@ -472,11 +501,6 @@ tbody tr:hover td {
     font-weight: 700;
 }
 
-.highlight-hours {
-    font-weight: 700;
-    color: #326528;
-    text-shadow: 1px 1px 0px #454545;
-}
 
 tbody td:nth-child(2),
 tbody td:nth-child(4),
@@ -486,14 +510,29 @@ tbody td:nth-last-child {
     background-color: green;
 }
 
+.highlight-hours {
+    font-weight: 900;
+    color: #000000;
+    text-shadow: 0px 0px 2px #848484;
+    background-color: #decce7;
+
+}
+
+tbody td:nth-child(1) {
+    padding: 0.5rem 0.1rem;
+    text-align: center;
+}
+
 tbody td:nth-child(4) {
-    background-color: rgb(227, 255, 250);
+    background-color: #ffdbdb;
 }
-tbody td:nth-child(9) {
-    background-color: rgb(227, 255, 228);
+
+tbody td:nth-child(5) {
+    background-color: #f4d6df;
 }
-tbody td:nth-child(10) {
-    background-color: rgb(255, 227, 227);
+
+tbody td:nth-child(6) {
+    background-color: #e9d1e3;
 }
 
 /* tbody tr:nth-child(even) td {

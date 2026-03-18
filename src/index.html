@@ -47,33 +47,17 @@
                             <line x1="12" y1="8" x2="12" y2="16"></line>
                             <line x1="8" y1="12" x2="16" y2="12"></line>
                         </svg> -->
-                                                    <svg 
-                            stroke="currentColor" 
-                            fill="none" 
-                            stroke-width="1.5" 
-                            viewBox="0 0 24 24" 
-                            stroke-linecap="round" 
-                            stroke-linejoin="round" 
-                            height="42" 
-                            width="42" 
-                            xmlns="http://www.w3.org/2000/svg"
-                            >
+                        <svg stroke="currentColor" fill="none" stroke-width="1.5" viewBox="0 0 24 24"
+                            stroke-linecap="round" stroke-linejoin="round" height="42" width="42"
+                            xmlns="http://www.w3.org/2000/svg">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            
-                            <text 
-                                x="12" 
-                                y="12.5" 
-                                font-family="system-ui, -apple-system, sans-serif" 
-                                font-size="6" 
-                                font-weight="700" 
-                                text-anchor="middle" 
-                                dominant-baseline="middle" 
-                                fill="currentColor" 
-                                stroke="none"
-                            >
+
+                            <text x="12" y="12.5" font-family="system-ui, -apple-system, sans-serif" font-size="6"
+                                font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="currentColor"
+                                stroke="none">
                                 CLM
                             </text>
-                            </svg>
+                        </svg>
                     </div>
                     <h2>Upload CLM Files (XLS)</h2>
                     <label for="fileInput" class="btn btn-outline">Browse Files</label>
@@ -103,39 +87,48 @@
                         </svg>
                         <input type="text" id="searchInput" placeholder="Search by name, pass, vendor, or shift...">
                     </div>
-                    <label style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
+                    <label class="stat-button"
+                        style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
                         <input type="checkbox" id="addLunchCheckbox" style="width: 20px; height: 20px;">
                         Add Lunch
                     </label>
-                    <button id="btnEmployeeTotal" class="stat-button" onclick="employeewiseTotalHours()" style="display: none;">Employee Total</button>
-                    <button id="btnSkillTotal" class="stat-button" onclick="skillwiseTotalHours()" style="display: none;">Skill Total</button>
+                    <button id="btnEmployeeTotal" class="stat-button" onclick="employeewiseTotalHours()"
+                        style="display: none;">Employee Total</button>
+                    <button id="btnSkillTotal" class="stat-button" onclick="skillwiseTotalHours()"
+                        style="display: none;">Skill Total</button>
                 </div>
 
                 <div class="table-container">
                     <table id="dataTable">
                         <thead>
                             <tr>
-                                <th>SL.NO.</th>
+                                <th>SN</th>
                                 <th>DATE</th>
-                                <th>PASS NO</th>
-                                <th>EMPLOYEE NAME</th>
-                                <th>SKILL LEVEL</th>
-                                <!-- <th>VENDOR</th> -->
-                                <th>SHIFT</th>
-                                <th>IN</th>
-                                <th>OUT</th>
-                                <th>IN-TIME</th>
-                                <th>OUT-TIME</th>
-                                <!-- <th>DUTY-IN</th>
-                                <th>DUTY-OUT</th> -->
-                                <th>DUTY-HRS</th>
-                                <th>OT-HRS</th>
+                                <th>SP NO</th>
+                                <th class="highlight-header">NAME</th>
+                                <th class="highlight-header">PUNCH IN</th>
+                                <th class="highlight-header">PUNCH OUT</th>
                                 <th class="highlight-header">TOTAL HRS</th>
+                                <th>DUTY HRS</th>
+                                <th>OT HRS</th>
+                                <th>ADD LUNCH</th>
+                                <th>SHIFTS ALLOWED</th>
+                                <th>SHIFT</th>
+                                <th>SHIFT IN</th>
+                                <th>SHIFT OUT</th>
+                                <th>DUTY IN</th>
+                                <th>DUTY OUT</th>
+                                <th>SKILL</th>
+                                <th>DESIGNATION</th>
+                                <th>VENDOR NAME</th>
+                                <th>WORKORDER NO</th>
+                                <th>DEPT NAME</th>
+                                <th>SECTION</th>
                             </tr>
                         </thead>
                         <tbody id="tableBody">
                             <tr class="empty-state-row">
-                                <td colspan="15">
+                                <td colspan="22">
                                     <div class="empty-state">
                                         <div class="empty-state-icon">
                                             <svg stroke="currentColor" fill="none" stroke-width="1.5"

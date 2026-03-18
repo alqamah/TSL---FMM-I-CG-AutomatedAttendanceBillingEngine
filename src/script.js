@@ -10,7 +10,8 @@ const exportBtn = document.getElementById('exportBtn');
 const searchInput = document.getElementById('searchInput');
 const addLunchCheckbox = document.getElementById('addLunchCheckbox');
 
-let allProcessedData = [];
+let employeeData = [];
+let dateSortOrder = 'none'; // 'none' | 'asc' | 'desc'
 
 // Listen for file selections
 fileInput.addEventListener('change', handleFileSelect);
@@ -18,34 +19,70 @@ exportBtn.addEventListener('click', exportToExcel);
 if (searchInput) searchInput.addEventListener('input', renderTable);
 if (addLunchCheckbox) addLunchCheckbox.addEventListener('change', reprocessData);
 
+//data structure blueprint for employess
+/*
+let employeeData = [
+    {
+        date: from Uploaded file
+        sp_no: from Uploaded file
+        name: from Uploaded file
+        vendor_name: from Uploaded file
+        workorder_no: from Uploaded file
+        dept_name: from Uploaded file
+        section: from Uploaded file
+        skill: from persistent_data
+        designation: from persistent_data   
+        shiftsAllowed[]: from persistent_data
+        shift: after assignShift()
+        shiftIn: after assignShift()
+        shiftOut: after assignShift()
+        punchIn: from Uploaded file
+        punchOut: from Uploaded file
+        dutyIn: after calculateHours()
+        dutyOut: after calculateHours()
+        addLunch: from addLunch button/flag
+        dutyHours: from calculateHours()
+        otHours: from calculateHours()
+        totalHours: from calculateHours()        
+    }
+]
+*/
+
+
+//IP FNS
 //file upload
 async function handleFileSelect(event) {
-    const files = Array.from(event.target.files);
-    if (!files.length) return;
+    try {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
 
-    statusSection.style.display = 'block';
+        statusSection.style.display = 'block';
 
-    // Clear previous list if running again? Or append? Let's clear for new batch.
-    fileStatusList.innerHTML = '';
-    allProcessedData = [];
-    tableBody.innerHTML = ''; // clear table
+        // Clear previous list if running again? Or append? Let's clear for new batch.
+        fileStatusList.innerHTML = '';
+        employeeData = [];
+        tableBody.innerHTML = ''; // clear table
 
-    fileCountBadge.textContent = `${files.length} File${files.length > 1 ? 's' : ''}`;
+        fileCountBadge.textContent = `${files.length} File${files.length > 1 ? 's' : ''}`;
 
-    for (const file of files) {
-        await processFile(file);
-    }
+        for (const file of files) {
+            await processFile(file);
+        }
 
-    // Render the processed data
-    renderTable();
+        // Render the processed data
+        renderTable();
 
-    if (allProcessedData.length > 0) {
-        exportBtn.disabled = false;
-        
-        const btnEmployeeTotal = document.getElementById('btnEmployeeTotal');
-        const btnSkillTotal = document.getElementById('btnSkillTotal');
-        if (btnEmployeeTotal) btnEmployeeTotal.style.display = 'block';
-        if (btnSkillTotal) btnSkillTotal.style.display = 'block';
+        if (employeeData.length > 0) {
+            exportBtn.disabled = false;
+
+            const btnEmployeeTotal = document.getElementById('btnEmployeeTotal');
+            const btnSkillTotal = document.getElementById('btnSkillTotal');
+            if (btnEmployeeTotal) btnEmployeeTotal.style.display = 'block';
+            if (btnSkillTotal) btnSkillTotal.style.display = 'block';
+        }
+
+    } catch (err) {
+        console.error('handleFileSelect error:', err);
     }
 }
 
@@ -101,9 +138,9 @@ async function processFile(file) {
         let headerRowIndex = -1;
         for (let i = 0; i < rawJsonArray.length; i++) {
             const row = rawJsonArray[i];
-            const rowStr = row.join('').toLowerCase();
+            const rowStr = row.join('').toLowerCase().replace(/\s+/g, '').replace(/-/g, '');
             // Look for columns we know exist
-            if (rowStr.includes('safetypassno') || rowStr.includes('employeename') || rowStr.includes('in time')) {
+            if (rowStr.includes('safetypassno') || rowStr.includes('employeename') || rowStr.includes('intime')) {
                 headerRowIndex = i;
                 break;
             }
@@ -121,8 +158,9 @@ async function processFile(file) {
             .filter(row => {
                 const empName = row['Employee Name'] ? String(row['Employee Name']).trim() : '';
                 let empId = row['Safety Pass No'] ? String(row['Safety Pass No']).trim() : '';
-                // Ignore empty footprint rows and rows not in EMPLOYEE_SKILLS
-                return empName !== '' && typeof EMPLOYEE_SKILLS !== 'undefined' && EMPLOYEE_SKILLS[empId];
+                if (!empName || !empId) return false;
+
+                return true;
             })
             .map((row, index) => {
                 const inTimeRaw = String(row['In Time'] || row['In-Time'] || '').trim();
@@ -134,10 +172,11 @@ async function processFile(file) {
                 const inTime = inMins !== null ? formatMinutesTo24h(inMins) : inTimeRaw;
                 const outTime = outMins !== null ? formatMinutesTo24h(outMins) : outTimeRaw;
 
-                let shift = String(row['Shift'] || '').trim().toUpperCase();
+                // Shift data is no longer extracted from the file; custom calculation will answer this later
+                let shift = '';
                 const employeeId = String(row['Safety Pass No'] || '').trim();
 
-                shift = assignShift(employeeId, shift);
+                shift = assignShift(employeeId, inTime, outTime);
 
                 let shiftIn = '';
                 let shiftOut = '';
@@ -152,390 +191,591 @@ async function processFile(file) {
                 const formattedDutyIn = calc.dutyInMins !== null ? formatMinutesTo24h(calc.dutyInMins) : '';
                 const formattedDutyOut = calc.dutyOutMins !== null ? formatMinutesTo24h(calc.dutyOutMins) : '';
 
+                let skillVal = null;
+                let designationVal = null;
+                let shiftsAllowedVal = null;
+
+                if (typeof employee_details !== 'undefined') {
+                    const empDetails = employee_details.find(e => e.sp_no === employeeId);
+                    if (empDetails) {
+                        skillVal = empDetails.skill || null;
+                        designationVal = empDetails.designation || null;
+                        shiftsAllowedVal = empDetails.allowedShifts || null;
+                    }
+                }
+
                 return {
-                    'SL.NO.': allProcessedData.length + index + 1,
-                    'Date': normalizedDate,
-                    'Safety Pass No': row['Safety Pass No'] || '',
-                    'Skill Level': typeof EMPLOYEE_SKILLS !== 'undefined' && EMPLOYEE_SKILLS[row['Safety Pass No']] ? EMPLOYEE_SKILLS[row['Safety Pass No']] : 'Unknown',
-                    'Employee Name': row['Employee Name'] || '',
-                    'Vendor Code': row['Vendor Code'] || '',
-                    'Shift': shift === null ? '' : shift,
-                    'Shift-In': shiftIn === undefined ? 'N/A' : shiftIn,
-                    'Shift-Out': shiftOut === undefined ? 'N/A' : shiftOut,
-                    'In-Time': inTime === undefined ? 'N/A' : inTime,
-                    'Out-Time': outTime === undefined ? 'N/A' : outTime,
-                    'Duty-In': formattedDutyIn === undefined ? 'N/A' : formattedDutyIn,
-                    'Duty-Out': formattedDutyOut === undefined ? 'N/A' : formattedDutyOut,
-                    'Duty-Hours': calc.dutyHours === undefined ? 'N/A' : calc.dutyHours,
-                    'OT-Hours': calc.otHours === undefined ? 'N/A' : calc.otHours,
-                    'NET-HOURS': calc.netHours === undefined ? 'N/A' : calc.netHours,
+                    date: normalizedDate,
+                    sp_no: employeeId,
+                    name: row['Employee Name'] || '',
+                    vendor_name: row['Vendor Name'] || '',
+                    workorder_no: row['Workorder No'] || '',
+                    dept_name: row['Department Name'] || '',
+                    section: row['Section'] || '',
+                    skill: skillVal,
+                    designation: designationVal,
+                    shiftsAllowed: shiftsAllowedVal,
+                    shift: shift,
+                    shiftIn: shiftIn,
+                    shiftOut: shiftOut,
+                    punchIn: inTime,
+                    punchOut: outTime,
+                    dutyIn: formattedDutyIn,
+                    dutyOut: formattedDutyOut,
+                    addLunch: addLunch,
+                    dutyHours: calc.dutyHours,
+                    otHours: calc.otHours,
+                    totalHours: calc.netHours
                 };
             });
 
         // Append to master list
-        // Update SL NO based on master list length as we append
-        const updatedProcessedRows = processedRows.map((r, i) => ({ ...r, 'SL.NO.': allProcessedData.length + i + 1 }));
-        allProcessedData = allProcessedData.concat(updatedProcessedRows);
+        employeeData = employeeData.concat(processedRows);
 
         statusItem.classList.add('success');
         statusItem.querySelector('.status-text').textContent = 'Success';
 
     } catch (err) {
-        console.error(err);
+        console.error('processFile error:', err);
         statusItem.classList.add('error');
         statusItem.querySelector('.status-text').textContent = 'Failed';
     }
 }
+
+//PROCESSING FNS
 //----------------------------------------
 //hours calc fn
+
 function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, addLunch) {
-    if (!inTimeStr || !outTimeStr || String(inTimeStr).toLowerCase() === 'off' || String(outTimeStr).toLowerCase() === 'off') {
-        return { dutyInMins: null, dutyOutMins: null, netHours: 0 };
-    }
+    try {
+        if (!inTimeStr || !outTimeStr || String(inTimeStr).toLowerCase() === 'off' || String(outTimeStr).toLowerCase() === 'off') {
+            return { dutyInMins: null, dutyOutMins: null, netHours: 0 };
+        }
 
-    // Attempt to parse manually (hh:mm AM/PM)
-    const inMins = parseTimeFormatToMinutes(inTimeStr);
-    const outMins = parseTimeFormatToMinutes(outTimeStr);
-    const shiftInMins = shiftInStr ? parseTimeFormatToMinutes(shiftInStr) : null;
+        // Attempt to parse manually (hh:mm AM/PM)
+        const inMins = parseTimeFormatToMinutes(inTimeStr);
+        const outMins = parseTimeFormatToMinutes(outTimeStr);
+        const shiftInMins = shiftInStr ? parseTimeFormatToMinutes(shiftInStr) : null;
 
-    if (inMins === null || outMins === null) {
-        return { dutyInMins: null, dutyOutMins: null, netHours: 0 };
-    }
+        if (inMins === null || outMins === null) {
+            return { dutyInMins: null, dutyOutMins: null, netHours: 0 };
+        }
 
-    let dutyInMins = inMins;
-    let dutyOutMins = outMins;
+        let dutyInMins = inMins;
+        let dutyOutMins = outMins;
 
-    // if (shiftStr === 'C') {
-    //     dutyInMins = Math.ceil(inMins / 30) * 30;
-    //     dutyOutMins = Math.floor(outMins / 30) * 30;
-    // } else if (shiftInMins !== null) {
-    //     if (inMins <= shiftInMins + 15) {
-    //         dutyInMins = shiftInMins;
-    //     } else {
-    //         dutyInMins = Math.ceil(inMins / 30) * 30;
-    //     }
+        // if (shiftStr === 'C') {
+        //     dutyInMins = Math.ceil(inMins / 30) * 30;
+        //     dutyOutMins = Math.floor(outMins / 30) * 30;
+        // } else if (shiftInMins !== null) {
+        //     if (inMins <= shiftInMins + 15) {
+        //         dutyInMins = shiftInMins;
+        //     } else {
+        //         dutyInMins = Math.ceil(inMins / 30) * 30;
+        //     }
 
-    //     dutyOutMins = Math.floor(outMins / 30) * 30;
-    // }
+        //     dutyOutMins = Math.floor(outMins / 30) * 30;
+        // }
 
 
-    // this part needs further improvement in logic based on the designation and shifts allowed. 
-    //early/late in; early/late out; in/out present/na; ot applicable based on the designation 
-    
-    if (shiftInMins !== null && inMins > shiftInMins && inMins <= shiftInMins + 15)
-        dutyInMins = shiftInMins;
-    else{
-        if ((shiftInMins-inMins>59) || (shiftInMins == null))
-            dutyInMins = Math.ceil(inMins / 30) * 30;
-        else
+        // this part needs further improvement in logic based on the designation and shifts allowed. 
+        //early/late in; early/late out; in/out present/na; ot applicable based on the designation 
+
+        if (shiftInMins !== null && inMins > shiftInMins && inMins <= shiftInMins + 15)
             dutyInMins = shiftInMins;
+        else {
+            if ((shiftInMins - inMins > 59) || (shiftInMins == null))
+                dutyInMins = Math.ceil(inMins / 30) * 30;
+            else
+                dutyInMins = shiftInMins;
+        }
+        dutyOutMins = Math.floor(outMins / 30) * 30;
+
+        // If outTime is smaller, it crossed midnight (next day)
+        let diffMins = dutyOutMins - dutyInMins;
+        if (outMins < inMins) {
+            diffMins += 24 * 60;
+        } else if (diffMins < 0) {
+            diffMins = 0;
+        }
+
+        let totalHours = diffMins / 60;
+
+        if (!addLunch && (shiftStr === 'G' || shiftStr === 'W1')) {
+            totalHours = Math.max(0, totalHours - 1);
+        }
+
+        // Lunch hour is not to be calculated by the app's end, so netHours = totalHours
+        let netHours = totalHours;
+        let otHours = totalHours > 8 ? totalHours - 8 : 0;
+        let dutyHours = totalHours - otHours;
+
+        if (diffMins < 30) {
+            netHours = 0;
+            otHours = 0;
+            dutyHours = 0;
+        }
+
+        return {
+            dutyInMins,
+            dutyOutMins,
+            netHours: parseFloat(netHours.toFixed(2)),
+            otHours: parseFloat(otHours.toFixed(2)),
+            dutyHours: parseFloat(dutyHours.toFixed(2))
+        };
+    } catch (err) {
+        console.error('calculateHours error:', err);
+        return { dutyInMins: null, dutyOutMins: null, netHours: 0, otHours: 0, dutyHours: 0 };
     }
-    dutyOutMins = Math.floor(outMins / 30) * 30;
-
-    // If outTime is smaller, it crossed midnight (next day)
-    let diffMins = dutyOutMins - dutyInMins;
-    if (outMins < inMins) {
-        diffMins += 24 * 60;
-    } else if (diffMins < 0) {
-        diffMins = 0;
-    }
-
-    let totalHours = diffMins / 60;
-
-    if (!addLunch && (shiftStr === 'G' || shiftStr === 'W1')) {
-        totalHours = Math.max(0, totalHours - 1);
-    }
-
-    // Lunch hour is not to be calculated by the app's end, so netHours = totalHours
-    let netHours = totalHours;
-    let otHours = totalHours > 8 ? totalHours - 8 : 0;
-    let dutyHours = totalHours - otHours;
-
-    if (diffMins < 30) {
-        netHours = 0;
-        otHours = 0;
-        dutyHours = 0;
-    }
-
-    return {
-        dutyInMins,
-        dutyOutMins,
-        netHours: parseFloat(netHours.toFixed(2)),
-        otHours: parseFloat(otHours.toFixed(2)),
-        dutyHours: parseFloat(dutyHours.toFixed(2))
-    };
 }
 
 function reprocessData() {
-    const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
-    allProcessedData.forEach(row => {
-        const inTime = row['In-Time'];
-        const outTime = row['Out-Time'];
-        const shift = row['Shift'];
-        const shiftIn = row['Shift-In'];
-        
-        if (inTime !== 'N/A' && outTime !== 'N/A') {
-            const calc = calculateHours(inTime, outTime, shift, shiftIn, addLunch);
-            row['Duty-Hours'] = calc.dutyHours;
-            row['OT-Hours'] = calc.otHours;
-            row['NET-HOURS'] = calc.netHours;
-        }
-    });
-    renderTable();
+    try {
+        const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
+        employeeData.forEach(row => {
+            row.addLunch = addLunch; // update the stored value so the table reflects it
+
+            const inTime = row.punchIn;
+            const outTime = row.punchOut;
+            const shift = row.shift;
+            const shiftIn = row.shiftIn;
+
+            if (inTime && outTime && inTime !== 'N/A' && outTime !== 'N/A') {
+                const calc = calculateHours(inTime, outTime, shift, shiftIn, addLunch);
+                row.dutyHours = calc.dutyHours;
+                row.otHours = calc.otHours;
+                row.totalHours = calc.netHours;
+            }
+        });
+        renderTable();
+    } catch (err) {
+        console.error('reprocessData error:', err);
+    }
 }
 
-// assigns shift - for assigning custom shift to Drivers
-function assignShift(employeeId, currentShift) {
-    if (!DRIVERS.includes(employeeId) && currentShift === 'G') {
-        return 'W1';
+// Assigns the correct shift by finding the nearest shiftIn to punchIn.
+// punchIn should lie between shiftIn-120mins and shiftIn+120mins
+function assignShift(employeeId, punchIn, punchOut) {
+    try {
+        // Get allowed shifts for this employee from employee_details
+        const empDetails = (typeof employee_details !== 'undefined')
+            ? employee_details.find(e => e.sp_no === employeeId)
+            : null;
+
+        const allowedShifts = empDetails?.allowedShifts;
+
+        // If no employee details or no allowed shifts, fall back to all defined shifts
+        const shiftsToCheck = (allowedShifts && allowedShifts.length > 0)
+            ? allowedShifts
+            : Object.keys(SHIFT_DEFINITIONS);
+
+        const punchInMins = punchIn ? parseTimeFormatToMinutes(punchIn) : null;
+        const punchOutMins = punchOut ? parseTimeFormatToMinutes(punchOut) : null;
+
+        let bestShift = 'NA';
+        let bestDiff = Infinity;
+
+        // Primary: match punchIn against each shift's shiftIn within ±120 mins
+        if (punchInMins !== null) {
+            shiftsToCheck.forEach(shiftKey => {
+                const def = SHIFT_DEFINITIONS[shiftKey];
+                if (!def) return;
+                const shiftInMins = parseTimeFormatToMinutes(def.shiftIn);
+                if (shiftInMins === null) return;
+
+                // Calculate absolute difference, accounting for midnight wrap
+                let diff = Math.abs(punchInMins - shiftInMins);
+                if (diff > 720) diff = 1440 - diff; // handle midnight crossing
+
+                if (diff <= 120 && diff < bestDiff) {
+                    bestDiff = diff;
+                    bestShift = shiftKey;
+                }
+            });
+        }
+
+        // Fallback: if no match on punchIn, try punchOut against shiftOut
+        if (bestShift === 'NA' && punchOutMins !== null) {
+            bestDiff = Infinity;
+            shiftsToCheck.forEach(shiftKey => {
+                const def = SHIFT_DEFINITIONS[shiftKey];
+                if (!def) return;
+                const shiftOutMins = parseTimeFormatToMinutes(def.shiftOut);
+                if (shiftOutMins === null) return;
+
+                let diff = Math.abs(punchOutMins - shiftOutMins);
+                if (diff > 720) diff = 1440 - diff;
+
+                if (diff <= 120 && diff < bestDiff) {
+                    bestDiff = diff;
+                    bestShift = shiftKey;
+                }
+            });
+        }
+
+        console.log(`assignShift: ${employeeId} → punchIn=${punchIn}, punchOut=${punchOut}, assigned=${bestShift}`);
+        return bestShift;
+    } catch (err) {
+        console.error('assignShift error:', err);
+        return 'NA';
     }
-    return currentShift;
 }
 
 //----------------------------------------
+//NORMALISATION FNS
 // Converts standard "hh:mm AM/PM" format to minutes since midnight
 function parseTimeFormatToMinutes(timeStr) {
-    const timeMatch = String(timeStr).trim().match(/^(\d{1,2})[.:]?(\d{2})?\s*([aApP][mM])?$/);
-    if (!timeMatch) return null;
+    try {
+        const timeMatch = String(timeStr).trim().match(/^(\d{1,2})[.:]?(\d{2})?\s*([aApP][mM])?$/);
+        if (!timeMatch) return null;
 
-    let hours = parseInt(timeMatch[1], 10);
-    const mins = parseInt(timeMatch[2] || '0', 10);
-    const period = timeMatch[3] ? timeMatch[3].toUpperCase() : null;
+        let hours = parseInt(timeMatch[1], 10);
+        const mins = parseInt(timeMatch[2] || '0', 10);
+        const period = timeMatch[3] ? timeMatch[3].toUpperCase() : null;
 
-    if (period === 'PM' && hours < 12) hours += 12;
-    if (period === 'AM' && hours === 12) hours = 0;
+        if (period === 'PM' && hours < 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
 
-    return hours * 60 + mins;
+        return hours * 60 + mins;
+    } catch (err) {
+        console.error('parseTimeFormatToMinutes error:', err);
+        return null;
+    }
 }
 
 // Formats minutes since midnight to "HH:mm" (24h format)
 function formatMinutesTo24h(totalMinutes) {
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    try {
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    } catch (err) {
+        console.error('formatMinutesTo24h error:', err);
+        return '';
+    }
 }
 
 // Date normalization function 
 function normalizeDate(dateStr) {
-    if (!dateStr) return 'N/A';
+    try {
+        if (!dateStr) return 'N/A';
 
-    // Just a basic cleanup for now, it's already extracted.
-    // Replace slashes with dashes, trim spaces.
-    let clean = dateStr.replace(/\//g, '-').trim();
+        // Just a basic cleanup for now, it's already extracted.
+        // Replace slashes with dashes, trim spaces.
+        let clean = dateStr.replace(/\//g, '-').trim();
 
-    // Remove extra trailing words from extraction edge cases?
-    // the regex .match(/Date\s*:\s*(.*)/) could capture garbage.
-    const strictMatch = clean.match(/(\d{1,2}[-\s/]\d{1,2}[-\s/]\d{2,4})/);
-    if (strictMatch) {
-        clean = strictMatch[1].replace(/\s+/g, '-'); // replace spaces with dashes
+        // Remove extra trailing words from extraction edge cases?
+        // the regex .match(/Date\s*:\s*(.*)/) could capture garbage.
+        const strictMatch = clean.match(/(\d{1,2}[-\s/]\d{1,2}[-\s/]\d{2,4})/);
+        if (strictMatch) {
+            clean = strictMatch[1].replace(/\s+/g, '-'); // replace spaces with dashes
+        }
+
+        return clean;
+    } catch (err) {
+        console.error('normalizeDate error:', err);
+        return 'N/A';
     }
-
-    return clean;
 }
 
 //----------------------------------------
+// SORTING FNS
+function toggleDateSort() {
+    try {
+        if (dateSortOrder === 'none') dateSortOrder = 'asc';
+        else if (dateSortOrder === 'asc') dateSortOrder = 'desc';
+        else dateSortOrder = 'none';
+        renderTable();
+    } catch (err) {
+        console.error('toggleDateSort error:', err);
+    }
+}
+
+// Parses date string (dd-mm-yyyy or dd/mm/yyyy) into a sortable timestamp
+function parseSortableDate(dateStr) {
+    try {
+        if (!dateStr || dateStr === 'N/A') return 0;
+        const parts = dateStr.split(/[-\/]/);
+        if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const year = parseInt(parts[2], 10);
+            return new Date(year, month, day).getTime();
+        }
+        return 0;
+    } catch (err) {
+        console.error('parseSortableDate error:', err);
+        return 0;
+    }
+}
+
+//----------------------------------------
+//OP FNS
 // Render table function
 function renderTable() {
-    if (allProcessedData.length === 0) return;
+    try {
+        if (employeeData.length === 0) return;
 
-    const thead = document.querySelector('#dataTable thead');
-    if (thead) {
-        thead.innerHTML = `
-            <tr>
-                <th>SL.NO.</th>
-                <th>DATE</th>
-                <th>PASS NO</th>
-                <th>EMPLOYEE NAME</th>
-                <th>SKILL LEVEL</th>
-                <th>SHIFT</th>
-                <th>IN</th>
-                <th>OUT</th>
-                <th>IN-TIME</th>
-                <th>OUT-TIME</th>
-                <th>DUTY-HRS</th>
-                <th>OT-HRS</th>
-                <th class="highlight-header">TOTAL HRS</th>
-            </tr>
-        `;
+        const thead = document.querySelector('#dataTable thead');
+        if (thead) {
+            thead.innerHTML = `
+                <tr>
+                    <th>SN</th>
+                    <th class="sortable-header" onclick="toggleDateSort()">
+                        DATE
+                        <span class="sort-arrows">
+                            <span class="sort-arrow up ${dateSortOrder === 'asc' ? 'active' : ''}">▲</span>
+                            <span class="sort-arrow down ${dateSortOrder === 'desc' ? 'active' : ''}">▼</span>
+                        </span>
+                    </th>
+                    <th>SP NO</th>
+                    <th>NAME</th>
+                    <th>PUNCH IN</th>
+                    <th>PUNCH OUT</th>
+                    <th class="highlight-header">TOTAL HRS</th>
+                    <th>DUTY HRS</th>
+                    <th>OT HRS</th>
+                    <th>ADD LUNCH</th>
+                    <th>SHIFTS ALLOWED</th>
+                    <th>SHIFT</th>
+                    <th>SHIFT IN</th>
+                    <th>SHIFT OUT</th>
+                    <th>DUTY IN</th>
+                    <th>DUTY OUT</th>
+                    <th>SKILL</th>
+                    <th>DESIGNATION</th>
+                    <th>VENDOR NAME</th>
+                    <th>WORKORDER NO</th>
+                    <th>DEPT NAME</th>
+                    <th>SECTION</th>
+                </tr>
+            `;
+        }
+
+        tableBody.innerHTML = ''; // clear empty state
+
+        const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+        const filteredData = employeeData.filter(row => {
+            if (!query) return true;
+            const searchStr = `${row.sp_no} ${row.name} ${row.vendor_name} ${row.shift}`.toLowerCase();
+            return searchStr.includes(query);
+        });
+
+        // Sort filtered data by date if sort is active
+        if (dateSortOrder !== 'none') {
+            filteredData.sort((a, b) => {
+                const dateA = parseSortableDate(a.date);
+                const dateB = parseSortableDate(b.date);
+                return dateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            });
+        }
+
+        if (filteredData.length === 0) {
+            tableBody.innerHTML = `
+                <tr class="empty-state-row">
+                    <td colspan="22">
+                        <div class="empty-state">
+                            <p>NO MATCHING RECORDS FOUND</p>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        // Render filtered rows
+        filteredData.forEach((row, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${row.date || ''}</td>
+                <td>${row.sp_no || ''}</td>
+                <td>${row.name || ''}</td>
+                <td>${row.punchIn || ''}</td>
+                <td>${row.punchOut || ''}</td>
+                <td class="highlight-hours">${row.totalHours ?? ''}</td>
+                <td>${row.dutyHours ?? ''}</td>
+                <td>${row.otHours ?? ''}</td>
+                <td>${row.addLunch ? 'Yes' : 'No'}</td>
+                <td>${(row.shiftsAllowed || []).join(', ') || ''}</td>
+                <td>${row.shift || ''}</td>
+                <td>${row.shiftIn || ''}</td>
+                <td>${row.shiftOut || ''}</td>
+                <td>${row.dutyIn || ''}</td>
+                <td>${row.dutyOut || ''}</td>
+                <td>${row.skill || ''}</td>
+                <td>${row.designation || ''}</td>
+                <td>${row.vendor_name || ''}</td>
+                <td>${row.workorder_no || ''}</td>
+                <td>${row.dept_name || ''}</td>
+                <td>${row.section || ''}</td>
+            `;
+            tableBody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('renderTable error:', err);
     }
-
-    tableBody.innerHTML = ''; // clear empty state
-
-    const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
-
-    const filteredData = allProcessedData.filter(row => {
-        if (!query) return true;
-        const searchStr = `${row['Safety Pass No']} ${row['Employee Name']} ${row['Vendor Code']} ${row['Shift']}`.toLowerCase();
-        return searchStr.includes(query);
-    });
-
-    if (filteredData.length === 0) {
-        tableBody.innerHTML = `
-            <tr class="empty-state-row">
-                <td colspan="15">
-                    <div class="empty-state">
-                        <p>NO MATCHING RECORDS FOUND</p>
-                    </div>
-                </td>
-            </tr>
-        `;
-        return;
-    }
-
-    // Render filtered rows
-    filteredData.forEach(row => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${row['SL.NO.']}</td>
-            <td>${row['Date']}</td>
-            <td>${row['Safety Pass No']}</td>
-            <td>${row['Employee Name']}</td>
-            <td>${row['Skill Level']}</td>
-            <!-- <td>${row['Vendor Code']}</td> -->
-            <td>${row['Shift']}</td>
-            <td>${row['Shift-In']}</td>
-            <td>${row['Shift-Out']}</td>
-            <td>${row['In-Time']}</td>
-            <td>${row['Out-Time']}</td>
-            <!-- <td>${row['Duty-In']}</td> -->
-            <!-- <td>${row['Duty-Out']}</td> -->
-            <td>${row['Duty-Hours']}</td>
-            <td>${row['OT-Hours']}</td>
-            <td class="highlight-hours">${row['NET-HOURS']}</td>
-        `;
-        tableBody.appendChild(tr);
-    });
 }
 
 function renderAggregatedTable(data, columns) {
-    const thead = document.querySelector('#dataTable thead');
-    const tbody = document.getElementById('tableBody');
-    
-    // Build header
-    let headerHTML = '<tr>';
-    columns.forEach(col => {
-        if(col === 'Total Hours' || col === 'Total Shifts') {
-             headerHTML += `<th class="highlight-header">${col}</th>`;
-        } else {
-             headerHTML += `<th>${col}</th>`;
-        }
-    });
-    headerHTML += '</tr>';
-    thead.innerHTML = headerHTML;
-    
-    // Build body
-    tbody.innerHTML = '';
-    data.forEach(row => {
-        const tr = document.createElement('tr');
-        let rowHTML = '';
+    try {
+        const thead = document.querySelector('#dataTable thead');
+        const tbody = document.getElementById('tableBody');
+
+        // Build header
+        let headerHTML = '<tr>';
         columns.forEach(col => {
-             if(col === 'Total Hours' || col === 'Total Shifts') {
-                 rowHTML += `<td class="highlight-hours">${row[col]}</td>`;
-             } else {
-                 rowHTML += `<td>${row[col]}</td>`;
-             }
+            if (col === 'Total Hours' || col === 'Total Shifts') {
+                headerHTML += `<th class="highlight-header">${col}</th>`;
+            } else {
+                headerHTML += `<th>${col}</th>`;
+            }
         });
-        tr.innerHTML = rowHTML;
-        tbody.appendChild(tr);
-    });
+        headerHTML += '</tr>';
+        thead.innerHTML = headerHTML;
+
+        // Build body
+        tbody.innerHTML = '';
+        data.forEach(row => {
+            const tr = document.createElement('tr');
+            let rowHTML = '';
+            columns.forEach(col => {
+                if (col === 'Total Hours' || col === 'Total Shifts') {
+                    rowHTML += `<td class="highlight-hours">${row[col]}</td>`;
+                } else {
+                    rowHTML += `<td>${row[col]}</td>`;
+                }
+            });
+            tr.innerHTML = rowHTML;
+            tbody.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('renderAggregatedTable error:', err);
+    }
 }
 
 function getEmployeeAggregatedData() {
-    if (allProcessedData.length === 0) return [];
-    
-    const aggregated = {};
-    allProcessedData.forEach(row => {
-        let empId = row['Safety Pass No'];
-        const name = row['Employee Name'];
-        // Ignore rows without employee ID
-        if (!empId) return; 
-        
-        empId = String(empId).trim();
-        
-        const key = `${empId}|${name}`;
-        if (!aggregated[key]) {
-            aggregated[key] = {
-                'Safety Pass No': empId,
-                'Employee Name': name,
-                'Total Hours': 0
-            };
-        }
-        aggregated[key]['Total Hours'] += (parseFloat(row['NET-HOURS']) || 0);
-    });
-    
-    return Object.values(aggregated).map((item, index) => ({
-        'SL.NO.': index + 1,
-        'Safety Pass No': item['Safety Pass No'],
-        'Employee Name': item['Employee Name'],
-        'Total Hours': parseFloat(item['Total Hours'].toFixed(2)),
-        'Total Shifts': parseFloat((item['Total Hours'] / 8).toFixed(2))
-    }));
+    try {
+        if (employeeData.length === 0) return [];
+
+        const aggregated = {};
+        employeeData.forEach(row => {
+            let empId = row.sp_no;
+            const name = row.name;
+            // Ignore rows without employee ID
+            if (!empId) return;
+
+            empId = String(empId).trim();
+
+            const key = `${empId}|${name}`;
+            if (!aggregated[key]) {
+                aggregated[key] = {
+                    'Safety Pass No': empId,
+                    'Employee Name': name,
+                    'Total Hours': 0
+                };
+            }
+            aggregated[key]['Total Hours'] += (parseFloat(row.totalHours) || 0);
+        });
+
+        return Object.values(aggregated).map((item, index) => ({
+            'SN': index + 1,
+            'Safety Pass No': item['Safety Pass No'],
+            'Employee Name': item['Employee Name'],
+            'Total Hours': parseFloat(item['Total Hours'].toFixed(2)),
+            'Total Shifts': parseFloat((item['Total Hours'] / 8).toFixed(2))
+        }));
+    } catch (err) {
+        console.error('getEmployeeAggregatedData error:', err);
+        return [];
+    }
 }
+
+//--------------------------------
+// AGGREGATE FNS
 
 function getSkillAggregatedData() {
-    if (allProcessedData.length === 0) return [];
-    
-    const aggregated = {
-        'High': 0,
-        'Medium': 0,
-        'Low': 0,
-        'Unknown': 0
-    };
-    
-    allProcessedData.forEach(row => {
-        let empId = row['Safety Pass No'];
-        if (!empId) return;
-        empId = String(empId).trim();
-        
-        const skill = typeof EMPLOYEE_SKILLS !== 'undefined' && EMPLOYEE_SKILLS[empId] ? EMPLOYEE_SKILLS[empId] : 'Unknown';
-        if (aggregated[skill] === undefined) {
-             aggregated[skill] = 0;
-        }
-        aggregated[skill] += (parseFloat(row['NET-HOURS']) || 0);
-    });
-    
-    return Object.keys(aggregated)
-        .filter(k => aggregated[k] > 0 || k !== 'Unknown')
-        .map((skill, index) => ({
-            'SL.NO.': index + 1,
-            'Skill Level': skill,
-            'Total Hours': parseFloat(aggregated[skill].toFixed(2)),
-            'Total Shifts': parseFloat((aggregated[skill] / 8).toFixed(2))
-        }));
+    try {
+        if (employeeData.length === 0) return [];
+
+        const aggregated = {
+            'High': 0,
+            'Medium': 0,
+            'Low': 0,
+            'Unknown': 0
+        };
+
+        employeeData.forEach(row => {
+            let empId = row.sp_no;
+            if (!empId) return;
+            empId = String(empId).trim();
+
+            const skill = row.skill || 'Unknown';
+            if (aggregated[skill] === undefined) {
+                aggregated[skill] = 0;
+            }
+            aggregated[skill] += (parseFloat(row.totalHours) || 0);
+        });
+
+        return Object.keys(aggregated)
+            .filter(k => aggregated[k] > 0 || k !== 'Unknown')
+            .map((skill, index) => ({
+                'SN': index + 1,
+                'Skill Level': skill,
+                'Total Hours': parseFloat(aggregated[skill].toFixed(2)),
+                'Total Shifts': parseFloat((aggregated[skill] / 8).toFixed(2))
+            }));
+    } catch (err) {
+        console.error('getSkillAggregatedData error:', err);
+        return [];
+    }
 }
 
-function employeewiseTotalHours(){
-    const resultData = getEmployeeAggregatedData();
-    if(resultData.length === 0) return;
-    renderAggregatedTable(resultData, ['SL.NO.', 'Safety Pass No', 'Employee Name', 'Total Hours', 'Total Shifts']);
+function employeewiseTotalHours() {
+    try {
+        const resultData = getEmployeeAggregatedData();
+        if (resultData.length === 0) return;
+        renderAggregatedTable(resultData, ['SL.NO.', 'Safety Pass No', 'Employee Name', 'Total Hours', 'Total Shifts']);
+    } catch (err) {
+        console.error('employeewiseTotalHours error:', err);
+    }
 }
 
-function skillwiseTotalHours(){
-    const resultData = getSkillAggregatedData();
-    if(resultData.length === 0) return;
-    renderAggregatedTable(resultData, ['SL.NO.', 'Skill Level', 'Total Hours', 'Total Shifts']);
+function skillwiseTotalHours() {
+    try {
+        const resultData = getSkillAggregatedData();
+        if (resultData.length === 0) return;
+        renderAggregatedTable(resultData, ['SL.NO.', 'Skill Level', 'Total Hours', 'Total Shifts']);
+    } catch (err) {
+        console.error('skillwiseTotalHours error:', err);
+    }
 }
 
 //excel export fn
 function exportToExcel() {
-    if (allProcessedData.length === 0) return;
+    try {
+        if (employeeData.length === 0) return;
 
-    const workbook = XLSX.utils.book_new();
+        const workbook = XLSX.utils.book_new();
 
-    const ws1 = XLSX.utils.json_to_sheet(allProcessedData);
-    XLSX.utils.book_append_sheet(workbook, ws1, "AttendanceData");
+        const ws1 = XLSX.utils.json_to_sheet(employeeData);
+        XLSX.utils.book_append_sheet(workbook, ws1, "AttendanceData");
 
-    const empData = getEmployeeAggregatedData();
-    if(empData.length > 0) {
-        const ws2 = XLSX.utils.json_to_sheet(empData);
-        XLSX.utils.book_append_sheet(workbook, ws2, "EmployeeHours");
+        const empData = getEmployeeAggregatedData();
+        if (empData.length > 0) {
+            const ws2 = XLSX.utils.json_to_sheet(empData);
+            XLSX.utils.book_append_sheet(workbook, ws2, "EmployeeHours");
+        }
+
+        const skillData = getSkillAggregatedData();
+        if (skillData.length > 0) {
+            const ws3 = XLSX.utils.json_to_sheet(skillData);
+            XLSX.utils.book_append_sheet(workbook, ws3, "SkillHours");
+        }
+
+        XLSX.writeFile(workbook, "Calculated_Working_Hours.xlsx");
+    } catch (err) {
+        console.error('exportToExcel error:', err);
     }
-
-    const skillData = getSkillAggregatedData();
-    if(skillData.length > 0) {
-        const ws3 = XLSX.utils.json_to_sheet(skillData);
-        XLSX.utils.book_append_sheet(workbook, ws3, "SkillHours");
-    }
-
-    XLSX.writeFile(workbook, "Calculated_Working_Hours.xlsx");
 }
