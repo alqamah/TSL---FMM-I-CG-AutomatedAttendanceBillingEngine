@@ -11,6 +11,7 @@ const searchInput = document.getElementById('searchInput');
 const addLunchCheckbox = document.getElementById('addLunchCheckbox');
 
 let employeeData = [];
+let dateSortOrder = 'none'; // 'none' | 'asc' | 'desc'
 
 // Listen for file selections
 fileInput.addEventListener('change', handleFileSelect);
@@ -158,7 +159,7 @@ async function processFile(file) {
                 const empName = row['Employee Name'] ? String(row['Employee Name']).trim() : '';
                 let empId = row['Safety Pass No'] ? String(row['Safety Pass No']).trim() : '';
                 if (!empName || !empId) return false;
-                
+
                 return true;
             })
             .map((row, index) => {
@@ -175,7 +176,7 @@ async function processFile(file) {
                 let shift = '';
                 const employeeId = String(row['Safety Pass No'] || '').trim();
 
-                shift = assignShift(employeeId, shift);
+                shift = assignShift(employeeId, inTime, outTime);
 
                 let shiftIn = '';
                 let shiftOut = '';
@@ -193,7 +194,7 @@ async function processFile(file) {
                 let skillVal = null;
                 let designationVal = null;
                 let shiftsAllowedVal = null;
-                
+
                 if (typeof employee_details !== 'undefined') {
                     const empDetails = employee_details.find(e => e.sp_no === employeeId);
                     if (empDetails) {
@@ -350,22 +351,71 @@ function reprocessData() {
     }
 }
 
-// assigns shift - uses employee_details[].designation to identify drivers
-function assignShift(employeeId, currentShift) {
+// Assigns the correct shift by finding the nearest shiftIn to punchIn.
+// punchIn should lie between shiftIn-120mins and shiftIn+120mins
+function assignShift(employeeId, punchIn, punchOut) {
     try {
-        let isDriver = false;
-        if (typeof employee_details !== 'undefined') {
-            const emp = employee_details.find(e => e.sp_no === employeeId);
-            isDriver = emp && emp.designation === 'driver';
+        // Get allowed shifts for this employee from employee_details
+        const empDetails = (typeof employee_details !== 'undefined')
+            ? employee_details.find(e => e.sp_no === employeeId)
+            : null;
+
+        const allowedShifts = empDetails?.allowedShifts;
+
+        // If no employee details or no allowed shifts, fall back to all defined shifts
+        const shiftsToCheck = (allowedShifts && allowedShifts.length > 0)
+            ? allowedShifts
+            : Object.keys(SHIFT_DEFINITIONS);
+
+        const punchInMins = punchIn ? parseTimeFormatToMinutes(punchIn) : null;
+        const punchOutMins = punchOut ? parseTimeFormatToMinutes(punchOut) : null;
+
+        let bestShift = 'NA';
+        let bestDiff = Infinity;
+
+        // Primary: match punchIn against each shift's shiftIn within ±120 mins
+        if (punchInMins !== null) {
+            shiftsToCheck.forEach(shiftKey => {
+                const def = SHIFT_DEFINITIONS[shiftKey];
+                if (!def) return;
+                const shiftInMins = parseTimeFormatToMinutes(def.shiftIn);
+                if (shiftInMins === null) return;
+
+                // Calculate absolute difference, accounting for midnight wrap
+                let diff = Math.abs(punchInMins - shiftInMins);
+                if (diff > 720) diff = 1440 - diff; // handle midnight crossing
+
+                if (diff <= 120 && diff < bestDiff) {
+                    bestDiff = diff;
+                    bestShift = shiftKey;
+                }
+            });
         }
 
-        if (!isDriver && currentShift === 'G') {
-            return 'W1';
+        // Fallback: if no match on punchIn, try punchOut against shiftOut
+        if (bestShift === 'NA' && punchOutMins !== null) {
+            bestDiff = Infinity;
+            shiftsToCheck.forEach(shiftKey => {
+                const def = SHIFT_DEFINITIONS[shiftKey];
+                if (!def) return;
+                const shiftOutMins = parseTimeFormatToMinutes(def.shiftOut);
+                if (shiftOutMins === null) return;
+
+                let diff = Math.abs(punchOutMins - shiftOutMins);
+                if (diff > 720) diff = 1440 - diff;
+
+                if (diff <= 120 && diff < bestDiff) {
+                    bestDiff = diff;
+                    bestShift = shiftKey;
+                }
+            });
         }
-        return currentShift;
+
+        console.log(`assignShift: ${employeeId} → punchIn=${punchIn}, punchOut=${punchOut}, assigned=${bestShift}`);
+        return bestShift;
     } catch (err) {
         console.error('assignShift error:', err);
-        return currentShift;
+        return 'NA';
     }
 }
 
@@ -427,6 +477,37 @@ function normalizeDate(dateStr) {
 }
 
 //----------------------------------------
+// SORTING FNS
+function toggleDateSort() {
+    try {
+        if (dateSortOrder === 'none') dateSortOrder = 'asc';
+        else if (dateSortOrder === 'asc') dateSortOrder = 'desc';
+        else dateSortOrder = 'none';
+        renderTable();
+    } catch (err) {
+        console.error('toggleDateSort error:', err);
+    }
+}
+
+// Parses date string (dd-mm-yyyy or dd/mm/yyyy) into a sortable timestamp
+function parseSortableDate(dateStr) {
+    try {
+        if (!dateStr || dateStr === 'N/A') return 0;
+        const parts = dateStr.split(/[-\/]/);
+        if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const year = parseInt(parts[2], 10);
+            return new Date(year, month, day).getTime();
+        }
+        return 0;
+    } catch (err) {
+        console.error('parseSortableDate error:', err);
+        return 0;
+    }
+}
+
+//----------------------------------------
 //OP FNS
 // Render table function
 function renderTable() {
@@ -437,28 +518,34 @@ function renderTable() {
         if (thead) {
             thead.innerHTML = `
                 <tr>
-                    <th>SL.NO.</th>
-                    <th>DATE</th>
+                    <th>SN</th>
+                    <th class="sortable-header" onclick="toggleDateSort()">
+                        DATE
+                        <span class="sort-arrows">
+                            <span class="sort-arrow up ${dateSortOrder === 'asc' ? 'active' : ''}">▲</span>
+                            <span class="sort-arrow down ${dateSortOrder === 'desc' ? 'active' : ''}">▼</span>
+                        </span>
+                    </th>
                     <th>SP NO</th>
                     <th>NAME</th>
-                    <th>VENDOR NAME</th>
-                    <th>WORKORDER NO</th>
-                    <th>DEPT NAME</th>
-                    <th>SECTION</th>
-                    <th>SKILL</th>
-                    <th>DESIGNATION</th>
+                    <th>PUNCH IN</th>
+                    <th>PUNCH OUT</th>
+                    <th class="highlight-header">TOTAL HRS</th>
+                    <th>DUTY HRS</th>
+                    <th>OT HRS</th>
+                    <th>ADD LUNCH</th>
                     <th>SHIFTS ALLOWED</th>
                     <th>SHIFT</th>
                     <th>SHIFT IN</th>
                     <th>SHIFT OUT</th>
-                    <th>PUNCH IN</th>
-                    <th>PUNCH OUT</th>
                     <th>DUTY IN</th>
                     <th>DUTY OUT</th>
-                    <th>ADD LUNCH</th>
-                    <th>DUTY HRS</th>
-                    <th>OT HRS</th>
-                    <th class="highlight-header">TOTAL HRS</th>
+                    <th>SKILL</th>
+                    <th>DESIGNATION</th>
+                    <th>VENDOR NAME</th>
+                    <th>WORKORDER NO</th>
+                    <th>DEPT NAME</th>
+                    <th>SECTION</th>
                 </tr>
             `;
         }
@@ -472,6 +559,15 @@ function renderTable() {
             const searchStr = `${row.sp_no} ${row.name} ${row.vendor_name} ${row.shift}`.toLowerCase();
             return searchStr.includes(query);
         });
+
+        // Sort filtered data by date if sort is active
+        if (dateSortOrder !== 'none') {
+            filteredData.sort((a, b) => {
+                const dateA = parseSortableDate(a.date);
+                const dateB = parseSortableDate(b.date);
+                return dateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            });
+        }
 
         if (filteredData.length === 0) {
             tableBody.innerHTML = `
@@ -494,24 +590,24 @@ function renderTable() {
                 <td>${row.date || ''}</td>
                 <td>${row.sp_no || ''}</td>
                 <td>${row.name || ''}</td>
-                <td>${row.vendor_name || ''}</td>
-                <td>${row.workorder_no || ''}</td>
-                <td>${row.dept_name || ''}</td>
-                <td>${row.section || ''}</td>
-                <td>${row.skill || ''}</td>
-                <td>${row.designation || ''}</td>
+                <td>${row.punchIn || ''}</td>
+                <td>${row.punchOut || ''}</td>
+                <td class="highlight-hours">${row.totalHours ?? ''}</td>
+                <td>${row.dutyHours ?? ''}</td>
+                <td>${row.otHours ?? ''}</td>
+                <td>${row.addLunch ? 'Yes' : 'No'}</td>
                 <td>${(row.shiftsAllowed || []).join(', ') || ''}</td>
                 <td>${row.shift || ''}</td>
                 <td>${row.shiftIn || ''}</td>
                 <td>${row.shiftOut || ''}</td>
-                <td>${row.punchIn || ''}</td>
-                <td>${row.punchOut || ''}</td>
                 <td>${row.dutyIn || ''}</td>
                 <td>${row.dutyOut || ''}</td>
-                <td>${row.addLunch ? 'Yes' : 'No'}</td>
-                <td>${row.dutyHours ?? ''}</td>
-                <td>${row.otHours ?? ''}</td>
-                <td class="highlight-hours">${row.totalHours ?? ''}</td>
+                <td>${row.skill || ''}</td>
+                <td>${row.designation || ''}</td>
+                <td>${row.vendor_name || ''}</td>
+                <td>${row.workorder_no || ''}</td>
+                <td>${row.dept_name || ''}</td>
+                <td>${row.section || ''}</td>
             `;
             tableBody.appendChild(tr);
         });
@@ -582,7 +678,7 @@ function getEmployeeAggregatedData() {
         });
 
         return Object.values(aggregated).map((item, index) => ({
-            'SL.NO.': index + 1,
+            'SN': index + 1,
             'Safety Pass No': item['Safety Pass No'],
             'Employee Name': item['Employee Name'],
             'Total Hours': parseFloat(item['Total Hours'].toFixed(2)),
@@ -623,7 +719,7 @@ function getSkillAggregatedData() {
         return Object.keys(aggregated)
             .filter(k => aggregated[k] > 0 || k !== 'Unknown')
             .map((skill, index) => ({
-                'SL.NO.': index + 1,
+                'SN': index + 1,
                 'Skill Level': skill,
                 'Total Hours': parseFloat(aggregated[skill].toFixed(2)),
                 'Total Shifts': parseFloat((aggregated[skill] / 8).toFixed(2))
