@@ -1,17 +1,16 @@
-this app calculates the total-working-hours of every employee from the clm data uploaded.
+# Working Hours Calculator
 
-Other features:
+This application calculates the exact total working hours, duty hours, and overtime (OT) for employees based on uploaded CLM (Contract Labor Management) punch-in and punch-out data. Designed to seamlessly handle complex payroll edge cases, this tool automatically assigns accurate shifts, enforces custom overtime logic, and generates reliable reporting aggregates.
 
-calculates the aggregate of skill-wise and employee-wise hours.
-
-handles most of the edge cases unlike CLM.
-
-has a feature to add lunch hours to the total working hours.
-
-assigns the shift based on the punch-in and punch-out times, and from the list of allowed shifts for each employee.
-
-has a feature to export the data to an excel file.
-
+### Key Features
+- **Smart Shift Allocation:** Automatically detects and assigns the appropriate shift based on punch-in/out times matching against the employee's allowed shifts list (CLM shift allocation is discarded).
+- **Advanced Aggregation:** Instantly aggregates parsed data into skill-wise and employee-wise hour breakdowns.
+- **Accurate Time Tracking:** Processes custom duty-hour calculations and strict block overtime increments according to duty logic rules, i.e. employee specific rules.
+- **Flexible Adjustments:** Includes an optional toggle to factor lunch hour deductions into the net total working hours.
+- **One-Click Exporting:** Directly export attendance data and processed aggregations to `.xlsx` files.
+- **Search Functionality:** Search bar to search in Name, ID and Date.
+- #### Local Database
+- **Persistent Data:** Employee details are stored in `persistent_data.js` file. This file is used to store employee details such as name, skill, designation, allowed shifts, allowed OT, etc. This file is used to store employee details such as name, skill, designation, allowed shifts, allowed OT, etc.
 
 ### Duty In (Check-In) Time Logic
 
@@ -28,3 +27,16 @@ has a feature to export the data to an excel file.
 | **Early Leaver** | Pulled out before shift end time | Rounded DOWN to previous 30 minutes (Penalty) | Shift ends 17:30. Left 17:15 ➔ Duty Out 17:00 |
 | **OT Out** | Stayed past shift end AND `allowedOT.out` is true | Rounded DOWN to previous 30 minutes | Shift ends 17:30. Left 18:25 ➔ Duty Out 18:00 |
 | **Normal Leave** | Left at or past shift end but no OT allowed | Exact Shift Out time | Shift ends 17:30. Left 18:15 ➔ Duty Out 17:30 |
+
+### Overtime (OT) Policy
+- All computed Overtime (OT) is automatically floored and allotted  in **30-minute chunks** (0.5 hour integers). 
+
+### Shift Definitions
+
+| Shift Code | Shift In | Shift Out |
+| :--- | :--- | :--- |
+| **A** | 06:00 | 14:00 |
+| **B** | 14:00 | 22:00 |
+| **C** | 22:00 | 06:00 |
+| **W1** | 08:30 | 17:30 |
+| **G** | 08:00 | 17:00 |
