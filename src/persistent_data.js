@@ -121,6 +121,7 @@ let employeeData = [
         addLunch: from addLunch button/flag
         dutyHours: from calculateHours()
         otHours: from calculateHours()
+        otAllowed: {in:boolean, out:boolean}
         totalHours: from calculateHours()        
     }
 ]

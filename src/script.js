@@ -195,6 +195,8 @@ async function processFile(file) {
                 let skillVal = null;
                 let designationVal = null;
                 let shiftsAllowedVal = null;
+                let inOTVal = false;
+                let outOTVal = false;
 
                 if (typeof employee_details !== 'undefined') {
                     const empDetails = employee_details.find(e => e.sp_no === employeeId);
@@ -202,6 +204,10 @@ async function processFile(file) {
                         skillVal = empDetails.skill || null;
                         designationVal = empDetails.designation || null;
                         shiftsAllowedVal = empDetails.allowedShifts || null;
+                        if (empDetails.allowedOT) {
+                            inOTVal = empDetails.allowedOT.in;
+                            outOTVal = empDetails.allowedOT.out;
+                        }
                     }
                 }
 
@@ -214,6 +220,8 @@ async function processFile(file) {
                     dept_name: row['Department Name'] || '',
                     section: row['Section'] || '',
                     skill: skillVal,
+                    inOT: inOTVal,
+                    outOT: outOTVal,
                     designation: designationVal,
                     shiftsAllowed: shiftsAllowedVal,
                     shift: shift,
@@ -334,9 +342,10 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, shiftOutStr
             totalHours = Math.max(0, totalHours - 1);
         }
 
-        let netHours = totalHours;
-        let otHours = totalHours > 8 ? totalHours - 8 : 0;
-        let dutyHours = totalHours - otHours;
+        let rawOtHours = totalHours > 8 ? totalHours - 8 : 0;
+        let otHours = Math.floor(rawOtHours * 2) / 2;
+        let dutyHours = Math.min(8, totalHours);
+        let netHours = dutyHours + otHours;
 
         if (diffMins < 30) {
             netHours = 0;
@@ -577,6 +586,8 @@ function renderTable() {
                     <th>DUTY IN</th>
                     <th>DUTY OUT</th>
                     <th>SKILL</th>
+                    <th>IN-OT</th>
+                    <th>OUT-OT</th>
                     <th>DESIGNATION</th>
                     <th>VENDOR NAME</th>
                     <th>WORKORDER NO</th>
@@ -608,7 +619,7 @@ function renderTable() {
         if (filteredData.length === 0) {
             tableBody.innerHTML = `
                 <tr class="empty-state-row">
-                    <td colspan="22">
+                    <td colspan="24">
                         <div class="empty-state">
                             <p>NO MATCHING RECORDS FOUND</p>
                         </div>
@@ -639,6 +650,8 @@ function renderTable() {
                 <td>${row.dutyIn || ''}</td>
                 <td>${row.dutyOut || ''}</td>
                 <td>${row.skill || ''}</td>
+                <td>${row.inOT ? 'Yes' : 'No'}</td>
+                <td>${row.outOT ? 'Yes' : 'No'}</td>
                 <td>${row.designation || ''}</td>
                 <td>${row.vendor_name || ''}</td>
                 <td>${row.workorder_no || ''}</td>
