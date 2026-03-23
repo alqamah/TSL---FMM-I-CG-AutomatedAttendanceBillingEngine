@@ -12,8 +12,38 @@ const addLunchCheckbox = document.getElementById('addLunchCheckbox');
 const columnPickerBtn = document.getElementById('columnPickerBtn');
 const columnPickerDropdown = document.getElementById('columnPickerDropdown');
 
+//EMPLOYEE DATA STRUCTURE BLUEPRINT
+/*
+let employeeData = [
+    {
+        date: from Uploaded file
+        sp_no: from Uploaded file
+        name: from Uploaded file
+        vendor_name: from Uploaded file
+        workorder_no: from Uploaded file
+        dept_name: from Uploaded file
+        section: from Uploaded file
+        skill: from persistent_data
+        designation: from persistent_data   
+        shiftsAllowed[]: from persistent_data
+        shift: after assignShift()
+        shiftIn: after assignShift()
+        shiftOut: after assignShift()
+        punchIn: from Uploaded file
+        punchOut: from Uploaded file
+        dutyIn: after calculateHours()
+        dutyOut: after calculateHours()
+        addLunch: from addLunch button/flag
+        dutyHours: from calculateHours()
+        otHours: from calculateHours()
+        inOtAllowed: from persistent_data
+        outOtAllowed: from persistent_data
+        totalHours: from calculateHours()        
+    }
+]
+*/
+
 let employeeData = [];
-let dateSortOrder = 'none'; // 'none' | 'asc' | 'desc'
 
 // Column visibility logic
 const dynamicStyle = document.createElement('style');
@@ -30,7 +60,7 @@ const COLUMN_DEFS = [
     { id: 'TOTAL_HRS', label: 'TOTAL HRS', defaultVisible: true },
     { id: 'DUTY_HRS', label: 'DUTY HRS', defaultVisible: true },
     { id: 'OT_HRS', label: 'OT HRS', defaultVisible: true },
-    { id: 'ADD_LUNCH', label: 'ADD LUNCH', defaultVisible: true },
+    { id: 'ADD_LUNCH', label: 'Allow LUNCH', defaultVisible: true },
     { id: 'SHIFTS_ALLOWED', label: 'SHIFTS ALLOWED', defaultVisible: true },
     { id: 'SHIFT', label: 'SHIFT', defaultVisible: true },
     { id: 'SHIFT_IN', label: 'SHIFT IN', defaultVisible: true },
@@ -38,30 +68,34 @@ const COLUMN_DEFS = [
     { id: 'DUTY_IN', label: 'DUTY IN', defaultVisible: true },
     { id: 'DUTY_OUT', label: 'DUTY OUT', defaultVisible: true },
     { id: 'SKILL', label: 'SKILL', defaultVisible: true },
-    { id: 'IN_OT', label: 'IN-OT', defaultVisible: true },
-    { id: 'OUT_OT', label: 'OUT-OT', defaultVisible: true },
+    { id: 'IN_OT', label: 'Allow IN-OT', defaultVisible: true },
+    { id: 'OUT_OT', label: 'Allow OUT-OT', defaultVisible: true },
     { id: 'DESIGNATION', label: 'DESIGNATION', defaultVisible: true },
     { id: 'VENDOR_NAME', label: 'VENDOR NAME', defaultVisible: true },
     { id: 'WORKORDER_NO', label: 'WORKORDER NO', defaultVisible: true },
     { id: 'DEPT_NAME', label: 'DEPT NAME', defaultVisible: true },
     { id: 'SECTION', label: 'SECTION', defaultVisible: true }
 ];
-
+//------------------------------------------------
+// TABLE PRE-RENDER FUNCTIONS
+// -----------------------------------------------
+//column visibility logic
 let hiddenColumns = new Set();
+let dateSortOrder = 'asc'; // 'none' | 'asc' | 'desc'
 if (columnPickerDropdown) {
     const header = document.createElement('div');
     header.className = 'column-dropdown-header';
     const toggleBtn = document.createElement('button');
     toggleBtn.className = 'column-toggle-btn';
     toggleBtn.textContent = 'Toggle All';
-    
+
     toggleBtn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
         // determine if we are selecting all or deselecting all
         const allSelected = hiddenColumns.size === 0;
-        
+
         if (allSelected) {
             // deselect all
             checkboxes.forEach(cb => cb.checked = false);
@@ -73,7 +107,7 @@ if (columnPickerDropdown) {
         }
         updateColumnVisibility();
     });
-    
+
     header.appendChild(toggleBtn);
     columnPickerDropdown.appendChild(header);
 
@@ -104,6 +138,18 @@ if (columnPickerDropdown) {
     });
 }
 
+// Sorting Date
+function toggleDateSort() {
+    try {
+        if (dateSortOrder === 'none') dateSortOrder = 'asc';
+        else if (dateSortOrder === 'asc') dateSortOrder = 'desc';
+        else dateSortOrder = 'none';
+        renderTable();
+    } catch (err) {
+        console.error('toggleDateSort error:', err);
+    }
+}
+
 function updateColumnVisibility() {
     let cssRules = '';
     hiddenColumns.forEach(childIndex => {
@@ -124,47 +170,16 @@ document.addEventListener('click', (e) => {
     }
 });
 updateColumnVisibility();
+// -----------------------------------------------
 
+// FILE UPLOAD
+// -----------------------------------------------
 // Listen for file selections
 fileInput.addEventListener('change', handleFileSelect);
 exportBtn.addEventListener('click', exportToExcel);
 if (searchInput) searchInput.addEventListener('input', renderTable);
 if (addLunchCheckbox) addLunchCheckbox.addEventListener('change', reprocessData);
 
-//data structure blueprint for employess
-/*
-let employeeData = [
-    {
-        date: from Uploaded file
-        sp_no: from Uploaded file
-        name: from Uploaded file
-        vendor_name: from Uploaded file
-        workorder_no: from Uploaded file
-        dept_name: from Uploaded file
-        section: from Uploaded file
-        skill: from persistent_data
-        designation: from persistent_data   
-        shiftsAllowed[]: from persistent_data
-        shift: after assignShift()
-        shiftIn: after assignShift()
-        shiftOut: after assignShift()
-        punchIn: from Uploaded file
-        punchOut: from Uploaded file
-        dutyIn: after calculateHours()
-        dutyOut: after calculateHours()
-        addLunch: from addLunch button/flag
-        dutyHours: from calculateHours()
-        otHours: from calculateHours()
-        inOtAllowed: from persistent_data
-        outOtAllowed: from persistent_data
-        totalHours: from calculateHours()        
-    }
-]
-*/
-//----------------------------------------
-
-
-//FILE INPUT & INGEST FUNCTIONS
 //file upload
 async function handleFileSelect(event) {
     try {
@@ -375,7 +390,7 @@ async function processFile(file) {
         statusItem.querySelector('.status-text').textContent = 'Failed';
     }
 }
-//----------------------------------------
+// -----------------------------------------------
 
 //DATA PROCESSING (MAIN) FUNCTIONS
 //hours calc fn for duty-in and duty-out
@@ -466,6 +481,7 @@ function calculateHours(inTimeStr, outTimeStr, shiftInStr, shiftOutStr, allowedO
         return { dutyInMins: null, dutyOutMins: null };
     }
 }
+
 function calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shiftStr, addLunch) {
     if (dutyInMins === null || dutyOutMins === null) return 0;
 
@@ -513,8 +529,7 @@ function calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dut
     return otHours;
 }
 
-// Assigns the correct shift by finding the nearest shiftIn to punchIn.
-// punchIn should lie between shiftIn-120mins and shiftIn+120mins(?)
+// Assigns the correct shift by finding the nearest shiftIn to punchIn else if shiftOut to punchOut else punchIn to shiftDefinitions
 function assignShift(employeeId, punchIn, punchOut) {
     try {
         // Get allowed shifts for this employee from employee_details
@@ -581,7 +596,7 @@ function assignShift(employeeId, punchIn, punchOut) {
     }
 }
 
-//reload data on page refresh
+//FINAL DETAILS ALLOCATION FUNCTION TO EMP OBJECT
 function reprocessData() {
     try {
         const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
@@ -630,9 +645,9 @@ function reprocessData() {
         console.error('reprocessData error:', err);
     }
 }
-//----------------------------------------
 
-//DATE, TIME NORMALISATION FUNCTIONS
+// -----------------------------------------------
+// DATE, TIME NORMALISATION FUNCTIONS
 // Converts standard "hh:mm AM/PM" format to minutes since midnight
 function parseTimeFormatToMinutes(timeStr) {
     try {
@@ -687,7 +702,6 @@ function normalizeDate(dateStr) {
         return 'N/A';
     }
 }
-//----------------------------------------
 
 // Parses date string (dd-mm-yyyy or dd/mm/yyyy) into a sortable timestamp
 function parseSortableDate(dateStr) {
@@ -706,20 +720,10 @@ function parseSortableDate(dateStr) {
         return 0;
     }
 }
-//----------------------------------------
+// -----------------------------------------------
 
-//OP FNS
-// Sorting Date
-function toggleDateSort() {
-    try {
-        if (dateSortOrder === 'none') dateSortOrder = 'asc';
-        else if (dateSortOrder === 'asc') dateSortOrder = 'desc';
-        else dateSortOrder = 'none';
-        renderTable();
-    } catch (err) {
-        console.error('toggleDateSort error:', err);
-    }
-}
+//TABLE RENDERING FUNCTIONS
+// -----------------------------------------------
 
 // Render table functions
 function renderTable() {
@@ -901,7 +905,7 @@ function getEmployeeAggregatedData() {
         });
 
         return Object.values(aggregated).map((item, index) => ({
-            'SN': index + 1,
+            'SL.NO.': index + 1,
             'Safety Pass No': item['Safety Pass No'],
             'Employee Name': item['Employee Name'],
             'Total Hours': parseFloat(item['Total Hours'].toFixed(2)),
@@ -918,10 +922,10 @@ function getSkillAggregatedData() {
         if (employeeData.length === 0) return [];
 
         const aggregated = {
-            'High': 0,
-            'Medium': 0,
-            'Low': 0,
-            'Unknown': 0
+            'HIGH': 0,
+            'MEDIUM': 0,
+            'LOW': 0,
+            'UNKNOWN': 0
         };
 
         employeeData.forEach(row => {
@@ -929,7 +933,9 @@ function getSkillAggregatedData() {
             if (!empId) return;
             empId = String(empId).trim();
 
-            const skill = row.skill || 'Unknown';
+            const rawSkill = row.skill || 'Unknown';
+            const skill = String(rawSkill).toUpperCase();
+            
             if (aggregated[skill] === undefined) {
                 aggregated[skill] = 0;
             }
@@ -937,9 +943,9 @@ function getSkillAggregatedData() {
         });
 
         return Object.keys(aggregated)
-            .filter(k => aggregated[k] > 0 || k !== 'Unknown')
+            .filter(k => aggregated[k] > 0 || k !== 'UNKNOWN')
             .map((skill, index) => ({
-                'SN': index + 1,
+                'SL.NO.': index + 1,
                 'Skill Level': skill,
                 'Total Hours': parseFloat(aggregated[skill].toFixed(2)),
                 'Total Shifts': parseFloat((aggregated[skill] / 8).toFixed(2))

@@ -65,7 +65,7 @@ const employee_details = [
     { sp_no: "RW0218129961", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], inOtAllowed: false, outOtAllowed: true },
     { sp_no: "RW0105038642", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], inOtAllowed: false, outOtAllowed: true },
     { sp_no: "RW0911183405", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], inOtAllowed: false, outOtAllowed: true },
-    { sp_no: "RW1103005471", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW1103005471", designation: "helper", skill: "low", allowedShifts: ['W1','A','B','G'], inOtAllowed: false, outOtAllowed: true },
     { sp_no: "JW0724246971", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], inOtAllowed: false, outOtAllowed: true },
     { sp_no: "RS0604000979", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], inOtAllowed: false, outOtAllowed: true },
     { sp_no: "RW0822573453", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], inOtAllowed: false, outOtAllowed: true },
