@@ -43,6 +43,8 @@ let employeeData = [
         addLunch: from addLunch button/flag
         dutyHours: from calculateHours()
         otHours: from calculateHours()
+        inOtAllowed: from persistent_data
+        outOtAllowed: from persistent_data
         totalHours: from calculateHours()        
     }
 ]
@@ -173,43 +175,54 @@ async function processFile(file) {
                 const inTime = inMins !== null ? formatMinutesTo24h(inMins) : inTimeRaw;
                 const outTime = outMins !== null ? formatMinutesTo24h(outMins) : outTimeRaw;
 
-                // Shift data is no longer extracted from the file; custom calculation will answer this later
-                let shift = '';
                 const employeeId = String(row['Safety Pass No'] || '').trim();
-
-                shift = assignShift(employeeId, inTime, outTime);
-
-                let shiftIn = '';
-                let shiftOut = '';
-                if (shift && SHIFT_DEFINITIONS[shift]) {
-                    shiftIn = SHIFT_DEFINITIONS[shift].shiftIn;
-                    shiftOut = SHIFT_DEFINITIONS[shift].shiftOut;
-                }
-
                 const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
-                const calc = calculateHours(inTime, outTime, shift, shiftIn, shiftOut, addLunch, employeeId);
 
-                const formattedDutyIn = calc.dutyInMins !== null ? formatMinutesTo24h(calc.dutyInMins) : '';
-                const formattedDutyOut = calc.dutyOutMins !== null ? formatMinutesTo24h(calc.dutyOutMins) : '';
-
+                // 2. from persistent data
                 let skillVal = null;
                 let designationVal = null;
-                let shiftsAllowedVal = null;
-                let inOTVal = false;
-                let outOTVal = false;
+                let shiftsAllowedVal = [];
+                let inOtAllowed = false;
+                let outOtAllowed = false;
 
                 if (typeof employee_details !== 'undefined') {
                     const empDetails = employee_details.find(e => e.sp_no === employeeId);
                     if (empDetails) {
                         skillVal = empDetails.skill || null;
                         designationVal = empDetails.designation || null;
-                        shiftsAllowedVal = empDetails.allowedShifts || null;
-                        if (empDetails.allowedOT) {
-                            inOTVal = empDetails.allowedOT.in;
-                            outOTVal = empDetails.allowedOT.out;
-                        }
+                        shiftsAllowedVal = empDetails.allowedShifts || [];
+                        inOtAllowed = !!empDetails.inOtAllowed;
+                        outOtAllowed = !!empDetails.outOtAllowed;
                     }
                 }
+
+                // 3. shift, shiftIn, shiftOut: from assignShiftFunction
+                const shift = assignShift(employeeId, inTime, outTime);
+                let shiftIn = '';
+                let shiftOut = '';
+                let shiftInMins = null;
+                let shiftOutMins = null;
+                
+                if (shift && SHIFT_DEFINITIONS[shift]) {
+                    shiftIn = SHIFT_DEFINITIONS[shift].shiftIn;
+                    shiftOut = SHIFT_DEFINITIONS[shift].shiftOut;
+                    shiftInMins = parseTimeFormatToMinutes(shiftIn);
+                    shiftOutMins = parseTimeFormatToMinutes(shiftOut);
+                }
+
+                // 4. dutyIn, dutyOut: calculateHours()
+                const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
+                const formattedDutyIn = dutyInMins !== null ? formatMinutesTo24h(dutyInMins) : '';
+                const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
+
+                // 5. dutyHours: calculateDutyHours()
+                const dutyHours = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
+
+                // 6. otHours: calculateOtHours()
+                const otHours = calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
+
+                // 7. totalHours: calculateHours()
+                const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
 
                 return {
                     date: normalizedDate,
@@ -220,8 +233,8 @@ async function processFile(file) {
                     dept_name: row['Department Name'] || '',
                     section: row['Section'] || '',
                     skill: skillVal,
-                    inOT: inOTVal,
-                    outOT: outOTVal,
+                    inOT: inOtAllowed,
+                    outOT: outOtAllowed,
                     designation: designationVal,
                     shiftsAllowed: shiftsAllowedVal,
                     shift: shift,
@@ -232,9 +245,9 @@ async function processFile(file) {
                     dutyIn: formattedDutyIn,
                     dutyOut: formattedDutyOut,
                     addLunch: addLunch,
-                    dutyHours: calc.dutyHours,
-                    otHours: calc.otHours,
-                    totalHours: calc.netHours
+                    dutyHours: parseFloat(dutyHours.toFixed(2)),
+                    otHours: parseFloat(otHours.toFixed(2)),
+                    totalHours: totalHours
                 };
             });
 
@@ -253,11 +266,11 @@ async function processFile(file) {
 //----------------------------------------
 
 //DATA PROCESSING (MAIN) FUNCTIONS
-//hours calc fn for duty-hours, ot-hours, net-hours by assigning duty-in and duty-out
-function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, shiftOutStr, addLunch, employeeId) {
+//hours calc fn for duty-in and duty-out
+function calculateHours(inTimeStr, outTimeStr, shiftInStr, shiftOutStr, allowedOtIn, allowedOtOut) {
     try {
         if (!inTimeStr || !outTimeStr || String(inTimeStr).toLowerCase() === 'off' || String(outTimeStr).toLowerCase() === 'off') {
-            return { dutyInMins: null, dutyOutMins: null, netHours: 0, otHours: 0, dutyHours: 0 };
+            return { dutyInMins: null, dutyOutMins: null };
         }
 
         const inMins = parseTimeFormatToMinutes(inTimeStr);
@@ -266,28 +279,21 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, shiftOutStr
         const shiftOutMins = shiftOutStr ? parseTimeFormatToMinutes(shiftOutStr) : null;
 
         if (inMins === null || outMins === null) {
-            return { dutyInMins: null, dutyOutMins: null, netHours: 0, otHours: 0, dutyHours: 0 };
-        }
-
-        let allowedOtIn = false;
-        let allowedOtOut = false;
-
-        if (typeof employee_details !== 'undefined' && employeeId) {
-            const empDetails = employee_details.find(e => e.sp_no === employeeId);
-            if (empDetails && empDetails.allowedOT) {
-                allowedOtIn = empDetails.allowedOT.in;
-                allowedOtOut = empDetails.allowedOT.out;
-            }
+            return { dutyInMins: null, dutyOutMins: null };
         }
 
         let dutyInMins = inMins;
         let dutyOutMins = outMins;
 
-        // returns 0 hours if punch-in and punch-out are less than 60 minutes apart (using this explicitly to prevent Night Shift Allocation)
-        if (outMins - inMins < 60) {
+        // returns 0 hours if punch-in and punch-out are less than 60 minutes apart 
+        // (using this explicitly to prevent Night Shift Allocation)[Eg. inTime: 6:01, outTime: 6:10; inTime+15min grace => outTime<inTime => Night Shift Allocated]
+        let diffRaw = outMins - inMins;
+        if (diffRaw < 0) diffRaw += 1440; // wrap around midnight
+        
+        if (diffRaw < 60) {
             dutyInMins = inMins;
             dutyOutMins = inMins;
-            return { dutyInMins, dutyOutMins, netHours: 0, otHours: 0, dutyHours: 0 };
+            return { dutyInMins, dutyOutMins };
         }
 
         // IN TIME LOGIC
@@ -335,69 +341,60 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, shiftOutStr
             dutyOutMins = shiftOutMins;
         }
 
-        // Calculate Difference
-        let diffMins = dutyOutMins - dutyInMins;
-        if (dutyOutMins < dutyInMins) {
-            diffMins += 1440;
-        } else if (diffMins < 0) {
-            diffMins = 0;
-        }
-
-        let totalHours = diffMins / 60;
-
-        if (!addLunch && (shiftStr === 'G' || shiftStr === 'W1')) {
-            totalHours = Math.max(0, totalHours - 1);
-        }
-
-        let rawOtHours = totalHours > 8 ? totalHours - 8 : 0;
-        let otHours = Math.floor(rawOtHours);
-        let dutyHours = Math.min(8, totalHours);
-        let netHours = dutyHours + otHours;
-
-        if (diffMins < 30) {
-            netHours = 0;
-            otHours = 0;
-            dutyHours = 0;
-        }
-
         return {
             dutyInMins,
-            dutyOutMins,
-            netHours: parseFloat(netHours.toFixed(2)),
-            otHours: parseFloat(otHours.toFixed(2)),
-            dutyHours: parseFloat(dutyHours.toFixed(2))
+            dutyOutMins
         };
     } catch (err) {
         console.error('calculateHours error:', err);
-        return { dutyInMins: null, dutyOutMins: null, netHours: 0, otHours: 0, dutyHours: 0 };
+        return { dutyInMins: null, dutyOutMins: null };
     }
 }
+function calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shiftStr, addLunch) {
+    if (dutyInMins === null || dutyOutMins === null) return 0;
+    
+    let endMins = shiftOutMins !== null ? shiftOutMins : dutyOutMins;
 
-//reload data on page refresh
-function reprocessData() {
-    try {
-        const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
-        employeeData.forEach(row => {
-            row.addLunch = addLunch; // update the stored value so the table reflects it
+    let diffActual = dutyOutMins - dutyInMins;
+    if (dutyOutMins < dutyInMins) diffActual += 1440;
 
-            const inTime = row.punchIn;
-            const outTime = row.punchOut;
-            const shift = row.shift;
-            const shiftIn = row.shiftIn;
-            const shiftOut = row.shiftOut;
-            const employeeId = row.sp_no;
+    let diffShift = endMins - dutyInMins;
+    if (endMins < dutyInMins) diffShift += 1440;
 
-            if (inTime && outTime && inTime !== 'N/A' && outTime !== 'N/A') {
-                const calc = calculateHours(inTime, outTime, shift, shiftIn, shiftOut, addLunch, employeeId);
-                row.dutyHours = calc.dutyHours;
-                row.otHours = calc.otHours;
-                row.totalHours = calc.netHours;
-            }
-        });
-        renderTable();
-    } catch (err) {
-        console.error('reprocessData error:', err);
+    let diffMins = Math.min(diffActual, diffShift);
+    if (diffMins < 0) diffMins = 0;
+
+    let totalHours = diffMins / 60;
+
+    if (!addLunch && (shiftStr === 'G' || shiftStr === 'W1')) {
+        totalHours = Math.max(0, totalHours - 1);
     }
+
+    let dutyHours = Math.min(8, totalHours);
+
+    if (diffActual < 30) {
+        dutyHours = 0;
+    }
+
+    return dutyHours;
+}
+
+function calculateOtHours(employeeId ,shiftInMins, shiftOutMins, dutyInMins, dutyOutMins) {
+    if (shiftOutMins === null || dutyOutMins === null || dutyInMins === null || shiftInMins === null) return 0;
+
+    let inOt=0, outOt=0;
+    const empDetails = employee_details.find(e => e.sp_no === employeeId);
+    if(empDetails){
+        if(empDetails.inOtAllowed && shiftInMins - dutyInMins > 59)
+            inOt = shiftInMins - dutyInMins;
+        if(empDetails.outOtAllowed && dutyOutMins - shiftOutMins > 59)
+            outOt = dutyOutMins - shiftOutMins;
+    }
+
+    let rawOtHours = (inOt + outOt) / 60;
+    let otHours = Math.floor(rawOtHours);
+
+    return otHours;
 }
 
 // Assigns the correct shift by finding the nearest shiftIn to punchIn.
@@ -465,6 +462,56 @@ function assignShift(employeeId, punchIn, punchOut) {
     } catch (err) {
         console.error('assignShift error:', err);
         return 'NA';
+    }
+}
+
+//reload data on page refresh
+function reprocessData() {
+    try {
+        const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
+        employeeData.forEach(row => {
+            row.addLunch = addLunch; // update the stored value so the table reflects it
+
+            // 1. data from row
+            const punch_in = row.punchIn;
+            const punch_out = row.punchOut;
+            const employeeId = row.sp_no;
+
+            if (punch_in && punch_out && punch_in !== 'N/A' && punch_out !== 'N/A') {
+                // 2. from persistent data
+                const inOtAllowed = row.inOT;
+                const outOtAllowed = row.outOT;
+
+                // 3. shift, shiftIn, shiftOut
+                const shift = row.shift;
+                const shiftIn = row.shiftIn;
+                const shiftOut = row.shiftOut;
+                const shiftInMins = shiftIn ? parseTimeFormatToMinutes(shiftIn) : null;
+                const shiftOutMins = shiftOut ? parseTimeFormatToMinutes(shiftOut) : null;
+
+                // 4. dutyIn, dutyOut: calculateHours()
+                const { dutyInMins, dutyOutMins } = calculateHours(punch_in, punch_out, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
+                
+                // 5. dutyHours: calculateDutyHours()
+                const dutyHours = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
+
+                // 6. otHours: calculateOtHours()
+                const otHours = calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
+
+                // 7. totalHours: calculateHours()
+                const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
+
+                row.dutyIn = dutyInMins !== null ? formatMinutesTo24h(dutyInMins) : '';
+                row.dutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
+                row.dutyHours = parseFloat(dutyHours.toFixed(2));
+                row.otHours = parseFloat(otHours.toFixed(2));
+                row.totalHours = totalHours;
+            }
+        });
+        // 8. RenderTable
+        renderTable();
+    } catch (err) {
+        console.error('reprocessData error:', err);
     }
 }
 //----------------------------------------
