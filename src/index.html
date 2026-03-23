@@ -87,9 +87,8 @@
                         </svg>
                         <input type="text" id="searchInput" placeholder="Search by name, pass, vendor, or shift...">
                     </div>
-                    <label class="stat-button"
-                        style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
-                        <input type="checkbox" id="addLunchCheckbox" style="width: 20px; height: 20px;">
+                    <label class="stat-button">
+                        <input type="checkbox" id="addLunchCheckbox" style="width: 20px; height: 20px; accent-color: var(--primary-color); cursor: pointer;">
                         Add Lunch
                     </label>
                     <button id="btnEmployeeTotal" class="stat-button" onclick="employeewiseTotalHours()"
@@ -98,6 +97,15 @@
                         style="display: none;">Skill Total</button>
                     <button id="btnExitAggregate" class="stat-button" onclick="reprocessData()"
                         style="display: none; background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; font-weight: bold;">✕ Close</button>
+                    
+                    <div class="column-picker-container" style="position: relative; display: flex;">
+                        <button id="columnPickerBtn" class="stat-button">
+                            Columns <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M3 12h18"/></svg>
+                        </button>
+                        <div id="columnPickerDropdown" class="column-dropdown" style="display: none; position: absolute;">
+                            <!-- Checkboxes injected by script.js -->
+                        </div>
+                    </div>
                 </div>
 
                 <div class="table-container">

@@ -9,9 +9,121 @@ const tableBody = document.getElementById('tableBody');
 const exportBtn = document.getElementById('exportBtn');
 const searchInput = document.getElementById('searchInput');
 const addLunchCheckbox = document.getElementById('addLunchCheckbox');
+const columnPickerBtn = document.getElementById('columnPickerBtn');
+const columnPickerDropdown = document.getElementById('columnPickerDropdown');
 
 let employeeData = [];
 let dateSortOrder = 'none'; // 'none' | 'asc' | 'desc'
+
+// Column visibility logic
+const dynamicStyle = document.createElement('style');
+dynamicStyle.id = 'dynamicColumnStyles';
+document.head.appendChild(dynamicStyle);
+
+const COLUMN_DEFS = [
+    { id: 'SN', label: 'SN', defaultVisible: true },
+    { id: 'DATE', label: 'DATE', defaultVisible: true },
+    { id: 'SP_NO', label: 'SP NO', defaultVisible: true },
+    { id: 'NAME', label: 'NAME', defaultVisible: true },
+    { id: 'PUNCH_IN', label: 'PUNCH IN', defaultVisible: true },
+    { id: 'PUNCH_OUT', label: 'PUNCH OUT', defaultVisible: true },
+    { id: 'TOTAL_HRS', label: 'TOTAL HRS', defaultVisible: true },
+    { id: 'DUTY_HRS', label: 'DUTY HRS', defaultVisible: true },
+    { id: 'OT_HRS', label: 'OT HRS', defaultVisible: true },
+    { id: 'ADD_LUNCH', label: 'ADD LUNCH', defaultVisible: true },
+    { id: 'SHIFTS_ALLOWED', label: 'SHIFTS ALLOWED', defaultVisible: true },
+    { id: 'SHIFT', label: 'SHIFT', defaultVisible: true },
+    { id: 'SHIFT_IN', label: 'SHIFT IN', defaultVisible: true },
+    { id: 'SHIFT_OUT', label: 'SHIFT OUT', defaultVisible: true },
+    { id: 'DUTY_IN', label: 'DUTY IN', defaultVisible: true },
+    { id: 'DUTY_OUT', label: 'DUTY OUT', defaultVisible: true },
+    { id: 'SKILL', label: 'SKILL', defaultVisible: true },
+    { id: 'IN_OT', label: 'IN-OT', defaultVisible: true },
+    { id: 'OUT_OT', label: 'OUT-OT', defaultVisible: true },
+    { id: 'DESIGNATION', label: 'DESIGNATION', defaultVisible: true },
+    { id: 'VENDOR_NAME', label: 'VENDOR NAME', defaultVisible: true },
+    { id: 'WORKORDER_NO', label: 'WORKORDER NO', defaultVisible: true },
+    { id: 'DEPT_NAME', label: 'DEPT NAME', defaultVisible: true },
+    { id: 'SECTION', label: 'SECTION', defaultVisible: true }
+];
+
+let hiddenColumns = new Set();
+if (columnPickerDropdown) {
+    const header = document.createElement('div');
+    header.className = 'column-dropdown-header';
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'column-toggle-btn';
+    toggleBtn.textContent = 'Toggle All';
+    
+    toggleBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // determine if we are selecting all or deselecting all
+        const allSelected = hiddenColumns.size === 0;
+        
+        if (allSelected) {
+            // deselect all
+            checkboxes.forEach(cb => cb.checked = false);
+            COLUMN_DEFS.forEach((col, i) => hiddenColumns.add(i + 1));
+        } else {
+            // select all
+            checkboxes.forEach(cb => cb.checked = true);
+            hiddenColumns.clear();
+        }
+        updateColumnVisibility();
+    });
+    
+    header.appendChild(toggleBtn);
+    columnPickerDropdown.appendChild(header);
+
+    const checkboxes = [];
+
+    COLUMN_DEFS.forEach((col, index) => {
+        const label = document.createElement('label');
+        label.className = 'column-dropdown-item';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = col.defaultVisible;
+        if (!col.defaultVisible) hiddenColumns.add(index + 1);
+
+        checkbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                hiddenColumns.delete(index + 1);
+            } else {
+                hiddenColumns.add(index + 1);
+            }
+            updateColumnVisibility();
+        });
+
+        checkboxes.push(checkbox);
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(col.label));
+        columnPickerDropdown.appendChild(label);
+    });
+}
+
+function updateColumnVisibility() {
+    let cssRules = '';
+    hiddenColumns.forEach(childIndex => {
+        cssRules += `#dataTable.main-view th:nth-child(${childIndex}), #dataTable.main-view td:nth-child(${childIndex}) { display: none !important; }\n`;
+    });
+    dynamicStyle.innerHTML = cssRules;
+}
+
+if (columnPickerBtn) {
+    columnPickerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        columnPickerDropdown.style.display = columnPickerDropdown.style.display === 'none' ? 'flex' : 'none';
+    });
+}
+document.addEventListener('click', (e) => {
+    if (columnPickerBtn && !columnPickerBtn.contains(e.target) && !columnPickerDropdown.contains(e.target)) {
+        columnPickerDropdown.style.display = 'none';
+    }
+});
+updateColumnVisibility();
 
 // Listen for file selections
 fileInput.addEventListener('change', handleFileSelect);
@@ -202,7 +314,7 @@ async function processFile(file) {
                 let shiftOut = '';
                 let shiftInMins = null;
                 let shiftOutMins = null;
-                
+
                 if (shift && SHIFT_DEFINITIONS[shift]) {
                     shiftIn = SHIFT_DEFINITIONS[shift].shiftIn;
                     shiftOut = SHIFT_DEFINITIONS[shift].shiftOut;
@@ -289,7 +401,7 @@ function calculateHours(inTimeStr, outTimeStr, shiftInStr, shiftOutStr, allowedO
         // (using this explicitly to prevent Night Shift Allocation)[Eg. inTime: 6:01, outTime: 6:10; inTime+15min grace => outTime<inTime => Night Shift Allocated]
         let diffRaw = outMins - inMins;
         if (diffRaw < 0) diffRaw += 1440; // wrap around midnight
-        
+
         if (diffRaw < 60) {
             dutyInMins = inMins;
             dutyOutMins = inMins;
@@ -315,6 +427,10 @@ function calculateHours(inTimeStr, outTimeStr, shiftInStr, shiftOutStr, allowedO
                 // Normal / Grace period
                 dutyInMins = shiftInMins;
             }
+        } else {
+            // No shift assigned
+            dutyInMins = Math.ceil(inMins / 30) * 30;
+            dutyOutMins = Math.floor(outMins / 30) * 30;
         }
 
         // OUT TIME LOGIC
@@ -352,7 +468,7 @@ function calculateHours(inTimeStr, outTimeStr, shiftInStr, shiftOutStr, allowedO
 }
 function calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shiftStr, addLunch) {
     if (dutyInMins === null || dutyOutMins === null) return 0;
-    
+
     let endMins = shiftOutMins !== null ? shiftOutMins : dutyOutMins;
 
     let diffActual = dutyOutMins - dutyInMins;
@@ -379,15 +495,15 @@ function calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shiftStr, add
     return dutyHours;
 }
 
-function calculateOtHours(employeeId ,shiftInMins, shiftOutMins, dutyInMins, dutyOutMins) {
+function calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins) {
     if (shiftOutMins === null || dutyOutMins === null || dutyInMins === null || shiftInMins === null) return 0;
 
-    let inOt=0, outOt=0;
+    let inOt = 0, outOt = 0;
     const empDetails = employee_details.find(e => e.sp_no === employeeId);
-    if(empDetails){
-        if(empDetails.inOtAllowed && shiftInMins - dutyInMins > 59)
+    if (empDetails) {
+        if (empDetails.inOtAllowed && shiftInMins - dutyInMins > 59)
             inOt = shiftInMins - dutyInMins;
-        if(empDetails.outOtAllowed && dutyOutMins - shiftOutMins > 59)
+        if (empDetails.outOtAllowed && dutyOutMins - shiftOutMins > 59)
             outOt = dutyOutMins - shiftOutMins;
     }
 
@@ -491,7 +607,7 @@ function reprocessData() {
 
                 // 4. dutyIn, dutyOut: calculateHours()
                 const { dutyInMins, dutyOutMins } = calculateHours(punch_in, punch_out, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
-                
+
                 // 5. dutyHours: calculateDutyHours()
                 const dutyHours = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
 
@@ -608,6 +724,7 @@ function toggleDateSort() {
 // Render table functions
 function renderTable() {
     try {
+        if (dataTable) dataTable.classList.add('main-view');
         const btnExit = document.getElementById('btnExitAggregate');
         if (btnExit) btnExit.style.display = 'none';
 
@@ -721,6 +838,7 @@ function renderTable() {
 
 function renderAggregatedTable(data, columns) {
     try {
+        if (dataTable) dataTable.classList.remove('main-view');
         const thead = document.querySelector('#dataTable thead');
         const tbody = document.getElementById('tableBody');
 
