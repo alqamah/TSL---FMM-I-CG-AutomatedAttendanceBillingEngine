@@ -271,7 +271,7 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, shiftOutStr
 
         let allowedOtIn = false;
         let allowedOtOut = false;
-        
+
         if (typeof employee_details !== 'undefined' && employeeId) {
             const empDetails = employee_details.find(e => e.sp_no === employeeId);
             if (empDetails && empDetails.allowedOT) {
@@ -282,6 +282,13 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, shiftOutStr
 
         let dutyInMins = inMins;
         let dutyOutMins = outMins;
+
+        // returns 0 hours if punch-in and punch-out are less than 60 minutes apart (using this explicitly to prevent Night Shift Allocation)
+        if (outMins - inMins < 60) {
+            dutyInMins = inMins;
+            dutyOutMins = inMins;
+            return { dutyInMins, dutyOutMins, netHours: 0, otHours: 0, dutyHours: 0 };
+        }
 
         // IN TIME LOGIC
         if (shiftInMins !== null) {
@@ -343,7 +350,7 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, shiftOutStr
         }
 
         let rawOtHours = totalHours > 8 ? totalHours - 8 : 0;
-        let otHours = Math.floor(rawOtHours * 2) / 2;
+        let otHours = Math.floor(rawOtHours);
         let dutyHours = Math.min(8, totalHours);
         let netHours = dutyHours + otHours;
 

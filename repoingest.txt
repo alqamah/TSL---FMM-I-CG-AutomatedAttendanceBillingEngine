@@ -1,8 +1,93 @@
-Directory structure:
-└── alqamah-tsl---fmm-i-cg-automatedattendancebillingengine/
-    └── src/
-        ├── index.html
-        └── script.js
+================================================
+FILE: readme.md
+================================================
+# Working Hours Calculator
+
+This application calculates the exact total working hours, duty hours, and overtime (OT) for employees based on uploaded CLM (Contract Labor Management) punch-in and punch-out data. Designed to seamlessly handle complex payroll edge cases, this tool automatically assigns accurate shifts, enforces custom overtime logic, and generates reliable reporting aggregates.
+
+### Key Features
+- **Smart Shift Allocation:** Automatically detects and assigns the appropriate shift based on punch-in/out times matching against the employee's allowed shifts list (CLM shift allocation is discarded).
+- **Advanced Aggregation:** Instantly aggregates parsed data into skill-wise and employee-wise hour breakdowns.
+- **Accurate Time Tracking:** Processes custom duty-hour calculations and strict block overtime increments according to duty logic rules, i.e. employee specific rules.
+- **Flexible Adjustments:** Includes an optional toggle to factor lunch hour deductions into the net total working hours.
+- **One-Click Exporting:** Directly export attendance data and processed aggregations to `.xlsx` files.
+- **Search Functionality:** Search bar to search in Name, ID and Date.
+- #### Local Database
+- **Persistent Data:** Employee details are stored in `persistent_data.js` file. This file is used to store employee details such as name, skill, designation, allowed shifts, allowed OT, etc. This file is used to store employee details such as name, skill, designation, allowed shifts, allowed OT, etc.
+
+### Duty In (Check-In) Time Logic
+
+| Scenario | Condition | Duty In Assigned | Example |
+| :--- | :--- | :--- | :--- |
+| **Early OT** | Checked in > 59 mins early AND `allowedOT.in` is true | Rounded UP to the next 30 minutes | Shift 08:30. Arrived 06:50 ➔ Duty In 07:00 |
+| **Normal / Grace** | Checked in anywhere up to 15 mins late OR slightly early | Exact Shift In time | Shift 08:30. Arrived 08:42 ➔ Duty In 08:30 |
+| **Late** | Checked in > 15 mins late | Rounded UP to the next 30 minutes (Penalty) | Shift 08:30. Arrived 08:47 ➔ Duty In 09:00 |
+
+### Duty Out (Check-Out) Time Logic
+
+| Scenario | Condition | Duty Out Assigned | Example |
+| :--- | :--- | :--- | :--- |
+| **Early Leaver** | Pulled out before shift end time | Rounded DOWN to previous 30 minutes (Penalty) | Shift ends 17:30. Left 17:15 ➔ Duty Out 17:00 |
+| **OT Out** | Stayed past shift end AND `allowedOT.out` is true | Rounded DOWN to previous 30 minutes | Shift ends 17:30. Left 18:25 ➔ Duty Out 18:00 |
+| **Normal Leave** | Left at or past shift end but no OT allowed | Exact Shift Out time | Shift ends 17:30. Left 18:15 ➔ Duty Out 17:30 |
+
+### Overtime (OT) Policy
+- All computed Overtime (OT) is automatically floored and allotted  in **30-minute chunks** (0.5 hour integers). 
+
+### Shift Definitions
+
+| Shift Code | Shift In | Shift Out |
+| :--- | :--- | :--- |
+| **A** | 06:00 | 14:00 |
+| **B** | 14:00 | 22:00 |
+| **C** | 22:00 | 06:00 |
+| **W1** | 08:30 | 17:30 |
+| **G** | 08:00 | 17:00 |
+
+
+================================================
+FILE: todo.txt
+================================================
+Fix shift allocation for w1.  ✅
+Add search bar
+Add download btn
+
+correct the logic for night shift ✅
+wrong output 
+32	03-02-2026	VD0722561172	RUPESH KUMAR	B445	U			18:34	06:02	19:00	06:00	0	0	0
+
+
+Drivers:
+//Chottu Lohar
+
+1. Sujit Kr. Vishwakarma - RD0721287965
+2. Nalin Mahato - RD0918134974
+3. Rupesh Kumar -VD0722561172
+4. Laxman Bhaduk - RW0305045827
+5. Raju Kalindi - RD1203000744
+6. Nipen Ch. Shukul - RW0807096365
+
+Perform search only on Name, ID and Date
+
+v3.0
+05/03: ✅
+1. shift allocation logic for drivers is not working for C Shift + OT. Need to hardcode the shift allocation for C shift wrt duty in-out time.
+2. for shifts G and W1, deduct 1h lunch from duty hours.
+
+
+v3.5
+18/03:
+1. Assign Shift based on nearest time. Do not consider CLM. -> use mean of nearest time else, 1h+ for far-away shifts. ✅
+2. Use allowed shifts array. ✅
+3. Sort date in final report. ✅
+
+v4
+19/03:
+1. Allow OT based on allowedOT array for IN and/or OUT. Implement this in hours calculation logic. ✅
+2. Separate OT calc. function. ✅
+3. persistent data alternative: create an xlsx downloadable table containing
+    SP_NO, NAME, SKILL, DESIGNATION, ALLOWED_SHIFTS, ALLOWED_OT_IN, ALLOWED_OT_OUT
+    Create an upload section to upload this xlsx file. Bypass the persistent data and use uploaded data after cleaning it. 
 
 
 ================================================
@@ -57,33 +142,17 @@ FILE: src/index.html
                             <line x1="12" y1="8" x2="12" y2="16"></line>
                             <line x1="8" y1="12" x2="16" y2="12"></line>
                         </svg> -->
-                                                    <svg 
-                            stroke="currentColor" 
-                            fill="none" 
-                            stroke-width="1.5" 
-                            viewBox="0 0 24 24" 
-                            stroke-linecap="round" 
-                            stroke-linejoin="round" 
-                            height="42" 
-                            width="42" 
-                            xmlns="http://www.w3.org/2000/svg"
-                            >
+                        <svg stroke="currentColor" fill="none" stroke-width="1.5" viewBox="0 0 24 24"
+                            stroke-linecap="round" stroke-linejoin="round" height="42" width="42"
+                            xmlns="http://www.w3.org/2000/svg">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            
-                            <text 
-                                x="12" 
-                                y="12.5" 
-                                font-family="system-ui, -apple-system, sans-serif" 
-                                font-size="6" 
-                                font-weight="700" 
-                                text-anchor="middle" 
-                                dominant-baseline="middle" 
-                                fill="currentColor" 
-                                stroke="none"
-                            >
+
+                            <text x="12" y="12.5" font-family="system-ui, -apple-system, sans-serif" font-size="6"
+                                font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="currentColor"
+                                stroke="none">
                                 CLM
                             </text>
-                            </svg>
+                        </svg>
                     </div>
                     <h2>Upload CLM Files (XLS)</h2>
                     <label for="fileInput" class="btn btn-outline">Browse Files</label>
@@ -113,45 +182,52 @@ FILE: src/index.html
                         </svg>
                         <input type="text" id="searchInput" placeholder="Search by name, pass, vendor, or shift...">
                     </div>
-                    <label class="stat-button" style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
+                    <label class="stat-button"
+                        style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
                         <input type="checkbox" id="addLunchCheckbox" style="width: 20px; height: 20px;">
                         Add Lunch
                     </label>
-                    <button id="btnEmployeeTotal" class="stat-button" onclick="employeewiseTotalHours()" style="display: none;">Employee Total</button>
-                    <button id="btnSkillTotal" class="stat-button" onclick="skillwiseTotalHours()" style="display: none;">Skill Total</button>
+                    <button id="btnEmployeeTotal" class="stat-button" onclick="employeewiseTotalHours()"
+                        style="display: none;">Employee Total</button>
+                    <button id="btnSkillTotal" class="stat-button" onclick="skillwiseTotalHours()"
+                        style="display: none;">Skill Total</button>
+                    <button id="btnExitAggregate" class="stat-button" onclick="reprocessData()"
+                        style="display: none; background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; font-weight: bold;">✕ Close</button>
                 </div>
 
                 <div class="table-container">
                     <table id="dataTable">
                         <thead>
                             <tr>
-                                <th>SL.NO.</th>
+                                <th>SN</th>
                                 <th>DATE</th>
                                 <th>SP NO</th>
-                                <th>NAME</th>
-                                <th>VENDOR NAME</th>
-                                <th>WORKORDER NO</th>
-                                <th>DEPT NAME</th>
-                                <th>SECTION</th>
-                                <th>SKILL</th>
-                                <th>DESIGNATION</th>
+                                <th class="highlight-header">NAME</th>
+                                <th class="highlight-header">PUNCH IN</th>
+                                <th class="highlight-header">PUNCH OUT</th>
+                                <th class="highlight-header">TOTAL HRS</th>
+                                <th>DUTY HRS</th>
+                                <th>OT HRS</th>
+                                <th>ADD LUNCH</th>
                                 <th>SHIFTS ALLOWED</th>
                                 <th>SHIFT</th>
                                 <th>SHIFT IN</th>
                                 <th>SHIFT OUT</th>
-                                <th>PUNCH IN</th>
-                                <th>PUNCH OUT</th>
                                 <th>DUTY IN</th>
                                 <th>DUTY OUT</th>
-                                <th>ADD LUNCH</th>
-                                <th>DUTY HRS</th>
-                                <th>OT HRS</th>
-                                <th class="highlight-header">TOTAL HRS</th>
+                                <th>SKILL</th>
+                                <th>IN-OT</th>
+                                <th>OUT-OT</th>
+                                <th>DESIGNATION</th>
+                                <th>VENDOR NAME</th>
+                                <th>WORKORDER NO</th>
+                                <th>DEPT NAME</th>
+                                <th>SECTION</th>
                             </tr>
                         </thead>
                         <tbody id="tableBody">
                             <tr class="empty-state-row">
-                                <td colspan="22">
+                                <td colspan="24">
                                     <div class="empty-state">
                                         <div class="empty-state-icon">
                                             <svg stroke="currentColor" fill="none" stroke-width="1.5"
@@ -181,6 +257,139 @@ FILE: src/index.html
 
 
 ================================================
+FILE: src/persistent_data.js
+================================================
+/*
+08.30-17.30
+06.00-14.00
+14.00-22.00
+
+Drivers Only
+06.00-14.00+(3)=17.00
+08.00-17.00+(2)=19.00
+19.00+(3)=22.00-06.00
+*/
+
+// const DRIVERS = [
+//     'RD0721287965',
+//     'RD0918134974',
+//     'VD0722561172',
+//     'RW0305045827',
+//     'RD1203000744',
+//     'RW0807096365'
+// ];
+
+// const EMPLOYEE_SKILLS = {
+//     'VW0123649596': 'High',
+//     'RW1011186925': 'High',
+//     'RW1019191001': 'High',
+//     'RW0911182377': 'High',
+//     'VW0123657591': 'High',
+//     'RW0305045827': 'High',
+//     'RW0403000921': 'High',
+//     'RD0918134974': 'High',
+//     'RW0807096365': 'High',
+//     'RW0608113053': 'High',
+//     'RD1203000744': 'High',
+//     'VD0722561172': 'High',
+//     'RW0916154862': 'High',
+//     'RD0721287965': 'High',
+//     'RW0218129961': 'Low',
+//     'RW0105038642': 'Low',
+//     'RW0911183405': 'Low',
+//     'RW1103005471': 'Low',
+//     'JW0724246971': 'Low',
+//     'RS0604000979': 'Low',
+//     'RW0822573453': 'Low',
+//     'RW0621276455': 'Low',
+//     'RW0512133959': 'Low',
+//     'RW0623791155': 'Low',
+//     'RW0723808557': 'Low',
+//     'RW0907097796': 'Medium',
+//     'RW1103006020': 'Medium',
+//     'RW0204008111': 'Medium',
+//     'RW1110162302': 'Medium',
+//     'RW1223956402': 'Medium',
+//     'RW0611151520': 'Medium'
+// };
+
+
+const employee_details = [
+    { sp_no: "VW0123649596", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW1011186925", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW1019191001", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0911182377", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "VW0123657591", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0305045827", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0403000921", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RD0918134974", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0807096365", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0608113053", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RD1203000744", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
+    { sp_no: "VD0722561172", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0916154862", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RD0721287965", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0218129961", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0105038642", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0911183405", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW1103005471", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "JW0724246971", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RS0604000979", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0822573453", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0621276455", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0512133959", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0623791155", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0723808557", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0907097796", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW1103006020", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0204008111", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW1110162302", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW1223956402", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
+    { sp_no: "RW0611151520", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} }
+];
+
+const SHIFT_DEFINITIONS = {
+    'A': { shiftIn: '06:00', shiftOut: '14:00' },
+    'B': { shiftIn: '14:00', shiftOut: '22:00' },
+    'C': { shiftIn: '22:00', shiftOut: '06:00' },
+    'W1': { shiftIn: '08:30', shiftOut: '17:30' },
+    'G': { shiftIn: '08:00', shiftOut: '17:00' }
+};
+
+
+/*
+//EMPLOYEE OBJ:
+
+let employeeData = [
+    {
+        date: from Uploaded file
+        sp_no: from Uploaded file
+        name: from Uploaded file
+        vendor_name: from Uploaded file
+        workorder_no: from Uploaded file
+        dept_name: from Uploaded file
+        section: from Uploaded file
+        skill: from persistent_data
+        designation: from persistent_data   
+        shiftsAllowed[]: from persistent_data
+        shift: after assignShift()
+        shiftIn: after assignShift()
+        shiftOut: after assignShift()
+        punchIn: from Uploaded file
+        punchOut: from Uploaded file
+        dutyIn: after calculateHours()
+        dutyOut: after calculateHours()
+        addLunch: from addLunch button/flag
+        dutyHours: from calculateHours()
+        otHours: from calculateHours()
+        otAllowed: {in:boolean, out:boolean}
+        totalHours: from calculateHours()        
+    }
+]
+*/
+
+
+================================================
 FILE: src/script.js
 ================================================
 // Core Application Logic for Working Hours Calculator
@@ -196,6 +405,7 @@ const searchInput = document.getElementById('searchInput');
 const addLunchCheckbox = document.getElementById('addLunchCheckbox');
 
 let employeeData = [];
+let dateSortOrder = 'none'; // 'none' | 'asc' | 'desc'
 
 // Listen for file selections
 fileInput.addEventListener('change', handleFileSelect);
@@ -231,9 +441,10 @@ let employeeData = [
     }
 ]
 */
+//----------------------------------------
 
 
-//IP FNS
+//FILE INPUT & INGEST FUNCTIONS
 //file upload
 async function handleFileSelect(event) {
     try {
@@ -343,7 +554,7 @@ async function processFile(file) {
                 const empName = row['Employee Name'] ? String(row['Employee Name']).trim() : '';
                 let empId = row['Safety Pass No'] ? String(row['Safety Pass No']).trim() : '';
                 if (!empName || !empId) return false;
-                
+
                 return true;
             })
             .map((row, index) => {
@@ -360,7 +571,7 @@ async function processFile(file) {
                 let shift = '';
                 const employeeId = String(row['Safety Pass No'] || '').trim();
 
-                shift = assignShift(employeeId, shift);
+                shift = assignShift(employeeId, inTime, outTime);
 
                 let shiftIn = '';
                 let shiftOut = '';
@@ -370,7 +581,7 @@ async function processFile(file) {
                 }
 
                 const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
-                const calc = calculateHours(inTime, outTime, shift, shiftIn, addLunch);
+                const calc = calculateHours(inTime, outTime, shift, shiftIn, shiftOut, addLunch, employeeId);
 
                 const formattedDutyIn = calc.dutyInMins !== null ? formatMinutesTo24h(calc.dutyInMins) : '';
                 const formattedDutyOut = calc.dutyOutMins !== null ? formatMinutesTo24h(calc.dutyOutMins) : '';
@@ -378,13 +589,19 @@ async function processFile(file) {
                 let skillVal = null;
                 let designationVal = null;
                 let shiftsAllowedVal = null;
-                
+                let inOTVal = false;
+                let outOTVal = false;
+
                 if (typeof employee_details !== 'undefined') {
                     const empDetails = employee_details.find(e => e.sp_no === employeeId);
                     if (empDetails) {
                         skillVal = empDetails.skill || null;
                         designationVal = empDetails.designation || null;
                         shiftsAllowedVal = empDetails.allowedShifts || null;
+                        if (empDetails.allowedOT) {
+                            inOTVal = empDetails.allowedOT.in;
+                            outOTVal = empDetails.allowedOT.out;
+                        }
                     }
                 }
 
@@ -397,6 +614,8 @@ async function processFile(file) {
                     dept_name: row['Department Name'] || '',
                     section: row['Section'] || '',
                     skill: skillVal,
+                    inOT: inOTVal,
+                    outOT: outOTVal,
                     designation: designationVal,
                     shiftsAllowed: shiftsAllowedVal,
                     shift: shift,
@@ -425,60 +644,88 @@ async function processFile(file) {
         statusItem.querySelector('.status-text').textContent = 'Failed';
     }
 }
-
-//PROCESSING FNS
 //----------------------------------------
-//hours calc fn
 
-function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, addLunch) {
+//DATA PROCESSING (MAIN) FUNCTIONS
+//hours calc fn for duty-hours, ot-hours, net-hours by assigning duty-in and duty-out
+function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, shiftOutStr, addLunch, employeeId) {
     try {
         if (!inTimeStr || !outTimeStr || String(inTimeStr).toLowerCase() === 'off' || String(outTimeStr).toLowerCase() === 'off') {
-            return { dutyInMins: null, dutyOutMins: null, netHours: 0 };
+            return { dutyInMins: null, dutyOutMins: null, netHours: 0, otHours: 0, dutyHours: 0 };
         }
 
-        // Attempt to parse manually (hh:mm AM/PM)
         const inMins = parseTimeFormatToMinutes(inTimeStr);
         const outMins = parseTimeFormatToMinutes(outTimeStr);
         const shiftInMins = shiftInStr ? parseTimeFormatToMinutes(shiftInStr) : null;
+        const shiftOutMins = shiftOutStr ? parseTimeFormatToMinutes(shiftOutStr) : null;
 
         if (inMins === null || outMins === null) {
-            return { dutyInMins: null, dutyOutMins: null, netHours: 0 };
+            return { dutyInMins: null, dutyOutMins: null, netHours: 0, otHours: 0, dutyHours: 0 };
+        }
+
+        let allowedOtIn = false;
+        let allowedOtOut = false;
+        
+        if (typeof employee_details !== 'undefined' && employeeId) {
+            const empDetails = employee_details.find(e => e.sp_no === employeeId);
+            if (empDetails && empDetails.allowedOT) {
+                allowedOtIn = empDetails.allowedOT.in;
+                allowedOtOut = empDetails.allowedOT.out;
+            }
         }
 
         let dutyInMins = inMins;
         let dutyOutMins = outMins;
 
-        // if (shiftStr === 'C') {
-        //     dutyInMins = Math.ceil(inMins / 30) * 30;
-        //     dutyOutMins = Math.floor(outMins / 30) * 30;
-        // } else if (shiftInMins !== null) {
-        //     if (inMins <= shiftInMins + 15) {
-        //         dutyInMins = shiftInMins;
-        //     } else {
-        //         dutyInMins = Math.ceil(inMins / 30) * 30;
-        //     }
+        // IN TIME LOGIC
+        if (shiftInMins !== null) {
+            let nInMins = inMins;
+            // Handle cross-day discrepancy (e.g. shift starts 22:00, punched at 01:00)
+            if (inMins < shiftInMins - 720) nInMins += 1440;
+            else if (inMins > shiftInMins + 720) nInMins -= 1440;
 
-        //     dutyOutMins = Math.floor(outMins / 30) * 30;
-        // }
-
-
-        // this part needs further improvement in logic based on the designation and shifts allowed. 
-        //early/late in; early/late out; in/out present/na; ot applicable based on the designation 
-
-        if (shiftInMins !== null && inMins > shiftInMins && inMins <= shiftInMins + 15)
-            dutyInMins = shiftInMins;
-        else {
-            if ((shiftInMins - inMins > 59) || (shiftInMins == null))
-                dutyInMins = Math.ceil(inMins / 30) * 30;
-            else
+            if (nInMins > shiftInMins + 15) {
+                // Late Check-In: Round UP to nearest 30 mins (Penalty)
+                let r = Math.ceil(nInMins / 30) * 30;
+                dutyInMins = (r % 1440 + 1440) % 1440;
+            } else if (allowedOtIn && (shiftInMins - nInMins > 59)) {
+                // Early OT: Round UP to nearest 30 mins (Reward)
+                let r = Math.ceil(nInMins / 30) * 30;
+                dutyInMins = (r % 1440 + 1440) % 1440;
+            } else {
+                // Normal / Grace period
                 dutyInMins = shiftInMins;
+            }
         }
-        dutyOutMins = Math.floor(outMins / 30) * 30;
 
-        // If outTime is smaller, it crossed midnight (next day)
+        // OUT TIME LOGIC
+        if (shiftOutMins !== null && shiftInMins !== null) {
+            let nOutMins = outMins;
+            if (outMins < inMins) nOutMins += 1440;
+
+            let nShiftOut = shiftOutMins;
+            if (shiftOutMins < shiftInMins) nShiftOut += 1440;
+
+            if (nOutMins < nShiftOut) {
+                // Early Leaver: Round DOWN to nearest 30 mins (Penalty)
+                let r = Math.floor(nOutMins / 30) * 30;
+                dutyOutMins = (r % 1440 + 1440) % 1440;
+            } else if (allowedOtOut) {
+                // OT Out: Round DOWN to nearest 30 mins (Reward)
+                let r = Math.floor(nOutMins / 30) * 30;
+                dutyOutMins = (r % 1440 + 1440) % 1440;
+            } else {
+                // Normal departure (no OT)
+                dutyOutMins = shiftOutMins;
+            }
+        } else if (shiftOutMins !== null) {
+            dutyOutMins = shiftOutMins;
+        }
+
+        // Calculate Difference
         let diffMins = dutyOutMins - dutyInMins;
-        if (outMins < inMins) {
-            diffMins += 24 * 60;
+        if (dutyOutMins < dutyInMins) {
+            diffMins += 1440;
         } else if (diffMins < 0) {
             diffMins = 0;
         }
@@ -489,10 +736,10 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, addLunch) {
             totalHours = Math.max(0, totalHours - 1);
         }
 
-        // Lunch hour is not to be calculated by the app's end, so netHours = totalHours
-        let netHours = totalHours;
-        let otHours = totalHours > 8 ? totalHours - 8 : 0;
-        let dutyHours = totalHours - otHours;
+        let rawOtHours = totalHours > 8 ? totalHours - 8 : 0;
+        let otHours = Math.floor(rawOtHours * 2) / 2;
+        let dutyHours = Math.min(8, totalHours);
+        let netHours = dutyHours + otHours;
 
         if (diffMins < 30) {
             netHours = 0;
@@ -513,17 +760,22 @@ function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, addLunch) {
     }
 }
 
+//reload data on page refresh
 function reprocessData() {
     try {
         const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
         employeeData.forEach(row => {
+            row.addLunch = addLunch; // update the stored value so the table reflects it
+
             const inTime = row.punchIn;
             const outTime = row.punchOut;
             const shift = row.shift;
             const shiftIn = row.shiftIn;
+            const shiftOut = row.shiftOut;
+            const employeeId = row.sp_no;
 
-            if (inTime !== 'N/A' && outTime !== 'N/A') {
-                const calc = calculateHours(inTime, outTime, shift, shiftIn, addLunch);
+            if (inTime && outTime && inTime !== 'N/A' && outTime !== 'N/A') {
+                const calc = calculateHours(inTime, outTime, shift, shiftIn, shiftOut, addLunch, employeeId);
                 row.dutyHours = calc.dutyHours;
                 row.otHours = calc.otHours;
                 row.totalHours = calc.netHours;
@@ -535,27 +787,76 @@ function reprocessData() {
     }
 }
 
-// assigns shift - uses employee_details[].designation to identify drivers
-function assignShift(employeeId, currentShift) {
+// Assigns the correct shift by finding the nearest shiftIn to punchIn.
+// punchIn should lie between shiftIn-120mins and shiftIn+120mins(?)
+function assignShift(employeeId, punchIn, punchOut) {
     try {
-        let isDriver = false;
-        if (typeof employee_details !== 'undefined') {
-            const emp = employee_details.find(e => e.sp_no === employeeId);
-            isDriver = emp && emp.designation === 'driver';
+        // Get allowed shifts for this employee from employee_details
+        const empDetails = (typeof employee_details !== 'undefined')
+            ? employee_details.find(e => e.sp_no === employeeId)
+            : null;
+
+        const allowedShifts = empDetails?.allowedShifts;
+
+        // If no employee details or no allowed shifts, fall back to all defined shifts
+        const shiftsToCheck = (allowedShifts && allowedShifts.length > 0)
+            ? allowedShifts
+            : Object.keys(SHIFT_DEFINITIONS);
+
+        const punchInMins = punchIn ? parseTimeFormatToMinutes(punchIn) : null;
+        const punchOutMins = punchOut ? parseTimeFormatToMinutes(punchOut) : null;
+
+        let bestShift = 'NA';
+        let bestDiff = Infinity;
+
+        // Primary: match punchIn against each shift's shiftIn within ±120 mins
+        if (punchInMins !== null) {
+            shiftsToCheck.forEach(shiftKey => {
+                const def = SHIFT_DEFINITIONS[shiftKey];
+                if (!def) return;
+                const shiftInMins = parseTimeFormatToMinutes(def.shiftIn);
+                if (shiftInMins === null) return;
+
+                // Calculate absolute difference, accounting for midnight wrap
+                let diff = Math.abs(punchInMins - shiftInMins);
+                if (diff > 720) diff = 1440 - diff; // handle midnight crossing
+
+                if (diff <= 120 && diff < bestDiff) {
+                    bestDiff = diff;
+                    bestShift = shiftKey;
+                }
+            });
         }
 
-        if (!isDriver && currentShift === 'G') {
-            return 'W1';
+        // Fallback: if no match on punchIn, try punchOut against shiftOut
+        if (bestShift === 'NA' && punchOutMins !== null) {
+            bestDiff = Infinity;
+            shiftsToCheck.forEach(shiftKey => {
+                const def = SHIFT_DEFINITIONS[shiftKey];
+                if (!def) return;
+                const shiftOutMins = parseTimeFormatToMinutes(def.shiftOut);
+                if (shiftOutMins === null) return;
+
+                let diff = Math.abs(punchOutMins - shiftOutMins);
+                if (diff > 720) diff = 1440 - diff;
+
+                if (diff <= 120 && diff < bestDiff) {
+                    bestDiff = diff;
+                    bestShift = shiftKey;
+                }
+            });
         }
-        return currentShift;
+
+        console.log(`assignShift: ${employeeId} → punchIn=${punchIn}, punchOut=${punchOut}, assigned=${bestShift}`);
+        return bestShift;
     } catch (err) {
         console.error('assignShift error:', err);
-        return currentShift;
+        return 'NA';
     }
 }
-
 //----------------------------------------
-//NORMALISATION FNS
+
+//DATE, TIME NORMALISATION FUNCTIONS
 // Converts standard "hh:mm AM/PM" format to minutes since midnight
 function parseTimeFormatToMinutes(timeStr) {
     try {
@@ -610,40 +911,82 @@ function normalizeDate(dateStr) {
         return 'N/A';
     }
 }
-
 //----------------------------------------
+
+// Parses date string (dd-mm-yyyy or dd/mm/yyyy) into a sortable timestamp
+function parseSortableDate(dateStr) {
+    try {
+        if (!dateStr || dateStr === 'N/A') return 0;
+        const parts = dateStr.split(/[-\/]/);
+        if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const year = parseInt(parts[2], 10);
+            return new Date(year, month, day).getTime();
+        }
+        return 0;
+    } catch (err) {
+        console.error('parseSortableDate error:', err);
+        return 0;
+    }
+}
+//----------------------------------------
+
 //OP FNS
-// Render table function
+// Sorting Date
+function toggleDateSort() {
+    try {
+        if (dateSortOrder === 'none') dateSortOrder = 'asc';
+        else if (dateSortOrder === 'asc') dateSortOrder = 'desc';
+        else dateSortOrder = 'none';
+        renderTable();
+    } catch (err) {
+        console.error('toggleDateSort error:', err);
+    }
+}
+
+// Render table functions
 function renderTable() {
     try {
+        const btnExit = document.getElementById('btnExitAggregate');
+        if (btnExit) btnExit.style.display = 'none';
+
         if (employeeData.length === 0) return;
 
         const thead = document.querySelector('#dataTable thead');
         if (thead) {
             thead.innerHTML = `
                 <tr>
-                    <th>SL.NO.</th>
-                    <th>DATE</th>
+                    <th>SN</th>
+                    <th class="sortable-header" onclick="toggleDateSort()">
+                        DATE
+                        <span class="sort-arrows">
+                            <span class="sort-arrow up ${dateSortOrder === 'asc' ? 'active' : ''}">▲</span>
+                            <span class="sort-arrow down ${dateSortOrder === 'desc' ? 'active' : ''}">▼</span>
+                        </span>
+                    </th>
                     <th>SP NO</th>
                     <th>NAME</th>
-                    <th>VENDOR NAME</th>
-                    <th>WORKORDER NO</th>
-                    <th>DEPT NAME</th>
-                    <th>SECTION</th>
-                    <th>SKILL</th>
-                    <th>DESIGNATION</th>
+                    <th>PUNCH IN</th>
+                    <th>PUNCH OUT</th>
+                    <th class="highlight-header">TOTAL HRS</th>
+                    <th>DUTY HRS</th>
+                    <th>OT HRS</th>
+                    <th>ADD LUNCH</th>
                     <th>SHIFTS ALLOWED</th>
                     <th>SHIFT</th>
                     <th>SHIFT IN</th>
                     <th>SHIFT OUT</th>
-                    <th>PUNCH IN</th>
-                    <th>PUNCH OUT</th>
                     <th>DUTY IN</th>
                     <th>DUTY OUT</th>
-                    <th>ADD LUNCH</th>
-                    <th>DUTY HRS</th>
-                    <th>OT HRS</th>
-                    <th class="highlight-header">TOTAL HRS</th>
+                    <th>SKILL</th>
+                    <th>IN-OT</th>
+                    <th>OUT-OT</th>
+                    <th>DESIGNATION</th>
+                    <th>VENDOR NAME</th>
+                    <th>WORKORDER NO</th>
+                    <th>DEPT NAME</th>
+                    <th>SECTION</th>
                 </tr>
             `;
         }
@@ -658,10 +1001,19 @@ function renderTable() {
             return searchStr.includes(query);
         });
 
+        // Sort filtered data by date if sort is active
+        if (dateSortOrder !== 'none') {
+            filteredData.sort((a, b) => {
+                const dateA = parseSortableDate(a.date);
+                const dateB = parseSortableDate(b.date);
+                return dateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+            });
+        }
+
         if (filteredData.length === 0) {
             tableBody.innerHTML = `
                 <tr class="empty-state-row">
-                    <td colspan="22">
+                    <td colspan="24">
                         <div class="empty-state">
                             <p>NO MATCHING RECORDS FOUND</p>
                         </div>
@@ -679,24 +1031,26 @@ function renderTable() {
                 <td>${row.date || ''}</td>
                 <td>${row.sp_no || ''}</td>
                 <td>${row.name || ''}</td>
-                <td>${row.vendor_name || ''}</td>
-                <td>${row.workorder_no || ''}</td>
-                <td>${row.dept_name || ''}</td>
-                <td>${row.section || ''}</td>
-                <td>${row.skill || ''}</td>
-                <td>${row.designation || ''}</td>
+                <td>${row.punchIn || ''}</td>
+                <td>${row.punchOut || ''}</td>
+                <td class="highlight-hours">${row.totalHours ?? ''}</td>
+                <td>${row.dutyHours ?? ''}</td>
+                <td>${row.otHours ?? ''}</td>
+                <td>${row.addLunch ? 'Yes' : 'No'}</td>
                 <td>${(row.shiftsAllowed || []).join(', ') || ''}</td>
                 <td>${row.shift || ''}</td>
                 <td>${row.shiftIn || ''}</td>
                 <td>${row.shiftOut || ''}</td>
-                <td>${row.punchIn || ''}</td>
-                <td>${row.punchOut || ''}</td>
                 <td>${row.dutyIn || ''}</td>
                 <td>${row.dutyOut || ''}</td>
-                <td>${row.addLunch ? 'Yes' : 'No'}</td>
-                <td>${row.dutyHours ?? ''}</td>
-                <td>${row.otHours ?? ''}</td>
-                <td class="highlight-hours">${row.totalHours ?? ''}</td>
+                <td>${row.skill || ''}</td>
+                <td>${row.inOT ? 'Yes' : 'No'}</td>
+                <td>${row.outOT ? 'Yes' : 'No'}</td>
+                <td>${row.designation || ''}</td>
+                <td>${row.vendor_name || ''}</td>
+                <td>${row.workorder_no || ''}</td>
+                <td>${row.dept_name || ''}</td>
+                <td>${row.section || ''}</td>
             `;
             tableBody.appendChild(tr);
         });
@@ -741,7 +1095,9 @@ function renderAggregatedTable(data, columns) {
         console.error('renderAggregatedTable error:', err);
     }
 }
+//----------------------------------------
 
+// AGGREGATE FNS
 function getEmployeeAggregatedData() {
     try {
         if (employeeData.length === 0) return [];
@@ -767,7 +1123,7 @@ function getEmployeeAggregatedData() {
         });
 
         return Object.values(aggregated).map((item, index) => ({
-            'SL.NO.': index + 1,
+            'SN': index + 1,
             'Safety Pass No': item['Safety Pass No'],
             'Employee Name': item['Employee Name'],
             'Total Hours': parseFloat(item['Total Hours'].toFixed(2)),
@@ -778,9 +1134,6 @@ function getEmployeeAggregatedData() {
         return [];
     }
 }
-
-//--------------------------------
-// AGGREGATE FNS
 
 function getSkillAggregatedData() {
     try {
@@ -808,7 +1161,7 @@ function getSkillAggregatedData() {
         return Object.keys(aggregated)
             .filter(k => aggregated[k] > 0 || k !== 'Unknown')
             .map((skill, index) => ({
-                'SL.NO.': index + 1,
+                'SN': index + 1,
                 'Skill Level': skill,
                 'Total Hours': parseFloat(aggregated[skill].toFixed(2)),
                 'Total Shifts': parseFloat((aggregated[skill] / 8).toFixed(2))
@@ -824,6 +1177,8 @@ function employeewiseTotalHours() {
         const resultData = getEmployeeAggregatedData();
         if (resultData.length === 0) return;
         renderAggregatedTable(resultData, ['SL.NO.', 'Safety Pass No', 'Employee Name', 'Total Hours', 'Total Shifts']);
+        const btnExit = document.getElementById('btnExitAggregate');
+        if (btnExit) btnExit.style.display = 'flex';
     } catch (err) {
         console.error('employeewiseTotalHours error:', err);
     }
@@ -834,6 +1189,8 @@ function skillwiseTotalHours() {
         const resultData = getSkillAggregatedData();
         if (resultData.length === 0) return;
         renderAggregatedTable(resultData, ['SL.NO.', 'Skill Level', 'Total Hours', 'Total Shifts']);
+        const btnExit = document.getElementById('btnExitAggregate');
+        if (btnExit) btnExit.style.display = 'flex';
     } catch (err) {
         console.error('skillwiseTotalHours error:', err);
     }
@@ -866,5 +1223,3 @@ function exportToExcel() {
         console.error('exportToExcel error:', err);
     }
 }
-
-
