@@ -81,7 +81,15 @@ const COLUMN_DEFS = [
 // -----------------------------------------------
 //column visibility logic
 let hiddenColumns = new Set();
-let dateSortOrder = 'asc'; // 'none' | 'asc' | 'desc'
+// Sort state for all sortable columns: 'none' | 'asc' | 'desc'
+const sortStates = {
+    date: 'asc',
+    name: 'none',
+    skill: 'none',
+    designation: 'none',
+    shiftsAllowed: 'none',
+    shift: 'none'
+};
 if (columnPickerDropdown) {
     const header = document.createElement('div');
     header.className = 'column-dropdown-header';
@@ -138,16 +146,25 @@ if (columnPickerDropdown) {
     });
 }
 
-// Sorting Date
-function toggleDateSort() {
+// Generic column sort toggle
+function toggleSort(col) {
     try {
-        if (dateSortOrder === 'none') dateSortOrder = 'asc';
-        else if (dateSortOrder === 'asc') dateSortOrder = 'desc';
-        else dateSortOrder = 'none';
+        if (sortStates[col] === 'none') sortStates[col] = 'asc';
+        else if (sortStates[col] === 'asc') sortStates[col] = 'desc';
+        else sortStates[col] = 'none';
         renderTable();
     } catch (err) {
-        console.error('toggleDateSort error:', err);
+        console.error('toggleSort error:', err);
     }
+}
+// Keep backward compat
+function toggleDateSort() { toggleSort('date'); }
+
+function sortArrowsHtml(col) {
+    return `<span class="sort-arrows">
+        <span class="sort-arrow up ${sortStates[col] === 'asc' ? 'active' : ''}">▲</span>
+        <span class="sort-arrow down ${sortStates[col] === 'desc' ? 'active' : ''}">▼</span>
+    </span>`;
 }
 
 function updateColumnVisibility() {
@@ -434,7 +451,7 @@ function calculateHours(inTimeStr, outTimeStr, shiftInStr, shiftOutStr, allowedO
                 // Late Check-In: Round UP to nearest 30 mins (Penalty)
                 let r = Math.ceil(nInMins / 30) * 30;
                 dutyInMins = (r % 1440 + 1440) % 1440;
-            } else if (allowedOtIn && (shiftInMins - nInMins > 59)) {
+            } else if (allowedOtIn && (shiftInMins - nInMins > 29)) {
                 // Early OT: Round UP to nearest 30 mins (Reward)
                 let r = Math.ceil(nInMins / 30) * 30;
                 dutyInMins = (r % 1440 + 1440) % 1440;
@@ -514,17 +531,37 @@ function calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shiftStr, add
 function calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins) {
     if (shiftOutMins === null || dutyOutMins === null || dutyInMins === null || shiftInMins === null) return 0;
 
+    const empDetails = (typeof employee_details !== 'undefined')
+        ? employee_details.find(e => e.sp_no === employeeId)
+        : null;
+
+    if (!empDetails) return 0;
+
     let inOt = 0, outOt = 0;
-    const empDetails = employee_details.find(e => e.sp_no === employeeId);
-    if (empDetails) {
-        if (empDetails.inOtAllowed && shiftInMins - dutyInMins > 59)
-            inOt = shiftInMins - dutyInMins;
-        if (empDetails.outOtAllowed && dutyOutMins - shiftOutMins > 59)
-            outOt = dutyOutMins - shiftOutMins;
+
+    // Helper: midnight-aware difference
+    function getDiff(target, actual, isArrival) {
+        let d = isArrival ? (target - actual) : (actual - target);
+        if (d < -720) d += 1440;
+        if (d > 720) d -= 1440;
+        return d;
     }
 
-    let rawOtHours = (inOt + outOt) / 60;
-    let otHours = Math.floor(rawOtHours);
+    //OT applicable only when ot >= 1h
+
+    if (empDetails.inOtAllowed) {
+        const diffIn = getDiff(shiftInMins, dutyInMins, true);
+        if (diffIn > 59) inOt = diffIn;
+    }
+
+    if (empDetails.outOtAllowed) {
+        const diffOut = getDiff(shiftOutMins, dutyOutMins, false);
+        if (diffOut > 59) outOt = diffOut;
+    }
+
+    // Round to nearest 0.5h
+    let totalOtMins = inOt + outOt;
+    let otHours = Math.floor(totalOtMins / 30) * 0.5;
 
     return otHours;
 }
@@ -532,36 +569,31 @@ function calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dut
 // Assigns the correct shift by finding the nearest shiftIn to punchIn else if shiftOut to punchOut else punchIn to shiftDefinitions
 function assignShift(employeeId, punchIn, punchOut) {
     try {
-        // Get allowed shifts for this employee from employee_details
-        const empDetails = (typeof employee_details !== 'undefined')
-            ? employee_details.find(e => e.sp_no === employeeId)
-            : null;
-
-        const allowedShifts = empDetails?.allowedShifts;
-
-        // If no employee details or no allowed shifts, fall back to all defined shifts
-        const shiftsToCheck = (allowedShifts && allowedShifts.length > 0)
-            ? allowedShifts
-            : Object.keys(SHIFT_DEFINITIONS);
-
         const punchInMins = punchIn ? parseTimeFormatToMinutes(punchIn) : null;
         const punchOutMins = punchOut ? parseTimeFormatToMinutes(punchOut) : null;
+
+        const abcShifts = ['A', 'B', 'C'];
+        const gwShifts = ['G', 'W1'];
 
         let bestShift = 'NA';
         let bestDiff = Infinity;
 
-        // Primary: match punchIn against each shift's shiftIn within ±120 mins
+        // Helper: midnight-aware absolute difference
+        function timeDiff(a, b) {
+            let d = Math.abs(a - b);
+            if (d > 720) d = 1440 - d;
+            return d;
+        }
+
+        // --- Step 1a: Try A, B, C shifts using punch-in against shiftIn ---
         if (punchInMins !== null) {
-            shiftsToCheck.forEach(shiftKey => {
+            abcShifts.forEach(shiftKey => {
                 const def = SHIFT_DEFINITIONS[shiftKey];
                 if (!def) return;
-                const shiftInMins = parseTimeFormatToMinutes(def.shiftIn);
-                if (shiftInMins === null) return;
+                const target = parseTimeFormatToMinutes(def.shiftIn);
+                if (target === null) return;
 
-                // Calculate absolute difference, accounting for midnight wrap
-                let diff = Math.abs(punchInMins - shiftInMins);
-                if (diff > 720) diff = 1440 - diff; // handle midnight crossing
-
+                const diff = timeDiff(punchInMins, target);
                 if (diff <= 120 && diff < bestDiff) {
                     bestDiff = diff;
                     bestShift = shiftKey;
@@ -569,23 +601,79 @@ function assignShift(employeeId, punchIn, punchOut) {
             });
         }
 
-        // Fallback: if no match on punchIn, try punchOut against shiftOut
+        // --- Step 1b: Fallback – if no A/B/C match on punchIn, try punchOut against shiftOut ---
         if (bestShift === 'NA' && punchOutMins !== null) {
-            bestDiff = Infinity;
-            shiftsToCheck.forEach(shiftKey => {
+            abcShifts.forEach(shiftKey => {
                 const def = SHIFT_DEFINITIONS[shiftKey];
                 if (!def) return;
-                const shiftOutMins = parseTimeFormatToMinutes(def.shiftOut);
-                if (shiftOutMins === null) return;
+                const target = parseTimeFormatToMinutes(def.shiftOut);
+                if (target === null) return;
 
-                let diff = Math.abs(punchOutMins - shiftOutMins);
-                if (diff > 720) diff = 1440 - diff;
-
+                const diff = timeDiff(punchOutMins, target);
                 if (diff <= 120 && diff < bestDiff) {
                     bestDiff = diff;
                     bestShift = shiftKey;
                 }
             });
+        }
+
+        // --- Step 2: Try G, W1 shifts using both punch-in and punch-out ---
+        // Collect candidates with their proximity scores
+        const gwCandidates = [];
+        gwShifts.forEach(shiftKey => {
+            const def = SHIFT_DEFINITIONS[shiftKey];
+            if (!def) return;
+
+            const shiftInMins = parseTimeFormatToMinutes(def.shiftIn);
+            const shiftOutMins = parseTimeFormatToMinutes(def.shiftOut);
+            if (shiftInMins === null || shiftOutMins === null) return;
+
+            let totalDiff = 0;
+            let matchCount = 0;
+
+            if (punchInMins !== null) {
+                totalDiff += timeDiff(punchInMins, shiftInMins);
+                matchCount++;
+            }
+            if (punchOutMins !== null) {
+                totalDiff += timeDiff(punchOutMins, shiftOutMins);
+                matchCount++;
+            }
+
+            if (matchCount > 0) {
+                const avgDiff = totalDiff / matchCount;
+                if (avgDiff <= 120) {
+                    // Estimate total working hours for this shift
+                    const effectiveIn = punchInMins !== null ? Math.max(punchInMins, shiftInMins) : shiftInMins;
+                    const effectiveOut = punchOutMins !== null ? Math.min(punchOutMins, shiftOutMins) : shiftOutMins;
+                    let estMins = effectiveOut - effectiveIn;
+                    if (estMins < 0) estMins += 1440;
+                    if (estMins > 720) estMins = 0; // sanity cap
+
+                    gwCandidates.push({ shiftKey, avgDiff, estMins });
+                }
+            }
+        });
+
+        // Pick best G/W1: if proximity scores are close (within 30 min), prefer max hours
+        if (gwCandidates.length > 0) {
+            gwCandidates.sort((a, b) => {
+                const diffGap = Math.abs(a.avgDiff - b.avgDiff);
+                if (diffGap <= 30) {
+                    // Close proximity — prefer shift with more estimated hours
+                    const hoursDiff = b.estMins - a.estMins;
+                    if (hoursDiff !== 0) return hoursDiff;
+                    // Same hours — prefer closer proximity
+                    return a.avgDiff - b.avgDiff;
+                }
+                return a.avgDiff - b.avgDiff;
+            });
+
+            const topGw = gwCandidates[0];
+            if (topGw.avgDiff < bestDiff) {
+                bestDiff = topGw.avgDiff;
+                bestShift = topGw.shiftKey;
+            }
         }
 
         console.log(`assignShift: ${employeeId} → punchIn=${punchIn}, punchOut=${punchOut}, assigned=${bestShift}`);
@@ -739,31 +827,37 @@ function renderTable() {
             thead.innerHTML = `
                 <tr>
                     <th>SN</th>
-                    <th class="sortable-header" onclick="toggleDateSort()">
-                        DATE
-                        <span class="sort-arrows">
-                            <span class="sort-arrow up ${dateSortOrder === 'asc' ? 'active' : ''}">▲</span>
-                            <span class="sort-arrow down ${dateSortOrder === 'desc' ? 'active' : ''}">▼</span>
-                        </span>
+                    <th class="sortable-header" onclick="toggleSort('date')">
+                        DATE ${sortArrowsHtml('date')}
                     </th>
                     <th>SP NO</th>
-                    <th>NAME</th>
+                    <th class="sortable-header" onclick="toggleSort('name')">
+                        NAME ${sortArrowsHtml('name')}
+                    </th>
                     <th>PUNCH IN</th>
                     <th>PUNCH OUT</th>
                     <th class="highlight-header">TOTAL HRS</th>
                     <th>DUTY HRS</th>
                     <th>OT HRS</th>
                     <th>ADD LUNCH</th>
-                    <th>SHIFTS ALLOWED</th>
-                    <th>SHIFT</th>
+                    <th class="sortable-header" onclick="toggleSort('shiftsAllowed')">
+                        SHIFTS ALLOWED ${sortArrowsHtml('shiftsAllowed')}
+                    </th>
+                    <th class="sortable-header" onclick="toggleSort('shift')">
+                        SHIFT ${sortArrowsHtml('shift')}
+                    </th>
                     <th>SHIFT IN</th>
                     <th>SHIFT OUT</th>
                     <th>DUTY IN</th>
                     <th>DUTY OUT</th>
-                    <th>SKILL</th>
+                    <th class="sortable-header" onclick="toggleSort('skill')">
+                        SKILL ${sortArrowsHtml('skill')}
+                    </th>
                     <th>IN-OT</th>
                     <th>OUT-OT</th>
-                    <th>DESIGNATION</th>
+                    <th class="sortable-header" onclick="toggleSort('designation')">
+                        DESIGNATION ${sortArrowsHtml('designation')}
+                    </th>
                     <th>VENDOR NAME</th>
                     <th>WORKORDER NO</th>
                     <th>DEPT NAME</th>
@@ -782,13 +876,39 @@ function renderTable() {
             return searchStr.includes(query);
         });
 
-        // Sort filtered data by date if sort is active
-        if (dateSortOrder !== 'none') {
+        // Apply active sorts (last toggled takes priority via stable sort)
+        const strCompare = (va, vb, order) => {
+            const sa = String(va || '').toLowerCase();
+            const sb = String(vb || '').toLowerCase();
+            const cmp = sa.localeCompare(sb);
+            return order === 'asc' ? cmp : -cmp;
+        };
+
+        if (sortStates.date !== 'none') {
             filteredData.sort((a, b) => {
                 const dateA = parseSortableDate(a.date);
                 const dateB = parseSortableDate(b.date);
-                return dateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+                return sortStates.date === 'asc' ? dateA - dateB : dateB - dateA;
             });
+        }
+        if (sortStates.name !== 'none') {
+            filteredData.sort((a, b) => strCompare(a.name, b.name, sortStates.name));
+        }
+        if (sortStates.skill !== 'none') {
+            filteredData.sort((a, b) => strCompare(a.skill, b.skill, sortStates.skill));
+        }
+        if (sortStates.designation !== 'none') {
+            filteredData.sort((a, b) => strCompare(a.designation, b.designation, sortStates.designation));
+        }
+        if (sortStates.shiftsAllowed !== 'none') {
+            filteredData.sort((a, b) => strCompare(
+                (a.shiftsAllowed || []).join(','),
+                (b.shiftsAllowed || []).join(','),
+                sortStates.shiftsAllowed
+            ));
+        }
+        if (sortStates.shift !== 'none') {
+            filteredData.sort((a, b) => strCompare(a.shift, b.shift, sortStates.shift));
         }
 
         if (filteredData.length === 0) {
@@ -809,29 +929,29 @@ function renderTable() {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${index + 1}</td>
-                <td>${row.date || ''}</td>
-                <td>${row.sp_no || ''}</td>
-                <td>${row.name || ''}</td>
-                <td>${row.punchIn || ''}</td>
-                <td>${row.punchOut || ''}</td>
-                <td class="highlight-hours">${row.totalHours ?? ''}</td>
-                <td>${row.dutyHours ?? ''}</td>
-                <td>${row.otHours ?? ''}</td>
-                <td>${row.addLunch ? 'Yes' : 'No'}</td>
-                <td>${(row.shiftsAllowed || []).join(', ') || ''}</td>
-                <td>${row.shift || ''}</td>
-                <td>${row.shiftIn || ''}</td>
-                <td>${row.shiftOut || ''}</td>
-                <td>${row.dutyIn || ''}</td>
-                <td>${row.dutyOut || ''}</td>
-                <td>${row.skill || ''}</td>
-                <td>${row.inOT ? 'Yes' : 'No'}</td>
-                <td>${row.outOT ? 'Yes' : 'No'}</td>
-                <td>${row.designation || ''}</td>
-                <td>${row.vendor_name || ''}</td>
-                <td>${row.workorder_no || ''}</td>
-                <td>${row.dept_name || ''}</td>
-                <td>${row.section || ''}</td>
+                <td title="date">${row.date || ''}</td>
+                <td title="sp-no">${row.sp_no || ''}</td>
+                <td title="name">${row.name || ''}</td>
+                <td title="punch-in">${row.punchIn || ''}</td>
+                <td title="punch-out">${row.punchOut || ''}</td>
+                <td title="total-hrs" class="highlight-hours">${row.totalHours ?? ''}</td>
+                <td title="duty-hrs">${row.dutyHours ?? ''}</td>
+                <td title="ot-hrs">${row.otHours ?? ''}</td>
+                <td title="add-lunch">${row.addLunch ? 'Yes' : 'No'}</td>
+                <td title="shifts-allowed">${(row.shiftsAllowed || []).join(', ') || ''}</td>
+                <td title="shift">${row.shift || ''}</td>
+                <td title="shift-in">${row.shiftIn || ''}</td>
+                <td title="shift-out">${row.shiftOut || ''}</td>
+                <td title="duty-in">${row.dutyIn || ''}</td>
+                <td title="duty-out">${row.dutyOut || ''}</td>
+                <td title="skill">${row.skill || ''}</td>
+                <td title="in-ot">${row.inOT ? 'Yes' : 'No'}</td>
+                <td title="out-ot">${row.outOT ? 'Yes' : 'No'}</td>
+                <td title="${('designation: ' + row.designation) || 'designation N/A'}">${row.designation || ''}</td>
+                <td title="vendor-name">${row.vendor_name || ''}</td>
+                <td title="workorder-no">${row.workorder_no || ''}</td>
+                <td title="dept-name">${row.dept_name || ''}</td>
+                <td title="section">${row.section || ''}</td>
             `;
             tableBody.appendChild(tr);
         });
@@ -935,7 +1055,7 @@ function getSkillAggregatedData() {
 
             const rawSkill = row.skill || 'Unknown';
             const skill = String(rawSkill).toUpperCase();
-            
+
             if (aggregated[skill] === undefined) {
                 aggregated[skill] = 0;
             }
