@@ -1,3 +1,6 @@
+# LIVE LINK
+https://alqamah.github.io/TSL---FMM-I-CG-AutomatedAttendanceBillingEngine/src/index.html
+
 # Working Hours Calculator
 
 This application calculates the exact total working hours, duty hours, and overtime (OT) for employees based on uploaded CLM (Contract Labor Management) punch-in and punch-out data. Designed to seamlessly handle complex payroll edge cases, this tool automatically assigns accurate shifts, enforces custom overtime logic, and generates reliable reporting aggregates.
