@@ -514,12 +514,17 @@ function calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shiftStr, add
     if (diffMins < 0) diffMins = 0;
 
     let totalHours = diffMins / 60;
+    let maxDuty = 8;
 
-    if (!addLunch && (shiftStr === 'G' || shiftStr === 'W1')) {
-        totalHours = Math.max(0, totalHours - 1);
+    if (shiftStr === 'G' || shiftStr === 'W1') {
+        if (!addLunch) {
+            totalHours = Math.max(0, totalHours - 1);
+        } else {
+            maxDuty = 9;
+        }
     }
 
-    let dutyHours = Math.min(8, totalHours);
+    let dutyHours = Math.min(maxDuty, totalHours);
 
     if (diffActual < 30) {
         dutyHours = 0;
