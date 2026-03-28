@@ -683,9 +683,13 @@ tbody td:nth-child(20) {
     align-items: center;
     padding: 1.5rem 2rem;
     background-color: #F7F8F0;
-    border: var(--border-width) solid #355872;
+    border: 1px solid #355872;
     border-radius: var(--radius-lg);
     margin-top: 1rem;
+    /* mix-blend-mode: difference;
+    filter: invert(100%); */
+
+
 }
 
 .footer-content {

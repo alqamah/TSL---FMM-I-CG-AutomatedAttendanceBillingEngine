@@ -944,7 +944,7 @@ function renderTable() {
                 <td title="ot-hrs">${row.otHours ?? ''}</td>
                 <td title="add-lunch">${row.addLunch ? 'Yes' : 'No'}</td>
                 <td title="shifts-allowed">${(row.shiftsAllowed || []).join(', ') || ''}</td>
-                <td title="shift">${row.shift || ''}</td>
+                <td title="shift"${(row.shiftsAllowed && !row.shiftsAllowed.includes(row.shift)) ? ' style="background-color: #E36A6A;"' : ''}>${row.shift || ''}</td>
                 <td title="shift-in">${row.shiftIn || ''}</td>
                 <td title="shift-out">${row.shiftOut || ''}</td>
                 <td title="duty-in">${row.dutyIn || ''}</td>
