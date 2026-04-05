@@ -1046,19 +1046,14 @@ function getSkillAggregatedData() {
     try {
         if (employeeData.length === 0) return [];
 
-        const aggregated = {
-            'HIGH': 0,
-            'MEDIUM': 0,
-            'LOW': 0,
-            'UNKNOWN': 0
-        };
+        const aggregated = {};
 
         employeeData.forEach(row => {
             let empId = row.sp_no;
             if (!empId) return;
             empId = String(empId).trim();
 
-            const rawSkill = row.skill || 'Unknown';
+            const rawSkill = row.skill || 'UNKNOWN';
             const skill = String(rawSkill).toUpperCase();
 
             if (aggregated[skill] === undefined) {
@@ -1068,7 +1063,6 @@ function getSkillAggregatedData() {
         });
 
         return Object.keys(aggregated)
-            .filter(k => aggregated[k] > 0 || k !== 'UNKNOWN')
             .map((skill, index) => ({
                 'SL.NO.': index + 1,
                 'Skill Level': skill,
