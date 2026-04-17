@@ -180,9 +180,13 @@ body {
 .upload-section {
     width: max-content;
     margin: 0 auto;
+    display: flex;
+    flex-direction: row;
+    gap: 2rem;
 }
 
 .upload-card {
+    width: 40rem;
     background-color: var(--bg-surface);
     border: var(--border-width) solid var(--border-color);
     border-radius: var(--radius-lg);

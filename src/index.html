@@ -59,9 +59,34 @@
                             </text>
                         </svg>
                     </div>
-                    <h2>Upload CLM Files (XLS)</h2>
-                    <label for="fileInput" class="btn btn-outline">Browse Files</label>
-                    <input type="file" id="fileInput" accept=".xls,.xlsx" multiple hidden>
+                    <h2>Upload CLM Attendee Report<br>Excel Files</h2>
+                    <label for="attendeeFileInput" class="btn btn-outline">Browse Files</label>
+                    <input type="file" id="attendeeFileInput" accept=".xls,.xlsx" multiple hidden>
+                </div>
+                <div class="upload-card">
+                    <div class="upload-icon">
+                        <!-- <svg stroke="currentColor" fill="none" stroke-width="1.5" viewBox="0 0 24 24"
+                            stroke-linecap="round" stroke-linejoin="round" height="42" width="42"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="12" y1="8" x2="12" y2="16"></line>
+                            <line x1="8" y1="12" x2="16" y2="12"></line>
+                        </svg> -->
+                        <svg stroke="currentColor" fill="none" stroke-width="1.5" viewBox="0 0 24 24"
+                            stroke-linecap="round" stroke-linejoin="round" height="42" width="42"
+                            xmlns="http://www.w3.org/2000/svg">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+
+                            <text x="12" y="12.5" font-family="system-ui, -apple-system, sans-serif" font-size="6"
+                                font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="currentColor"
+                                stroke="none">
+                                CLM
+                            </text>
+                        </svg>
+                    </div>
+                    <h2>Upload CLM Punch-In & Punch-Out<br> Excel Files</h2>
+                    <label for="punchFileInput" class="btn btn-outline">Browse Files</label>
+                    <input type="file" id="punchFileInput" accept=".xls,.xlsx" multiple hidden>
                 </div>
             </section>
 
@@ -88,7 +113,8 @@
                         <input type="text" id="searchInput" placeholder="Search by name, pass, vendor, or shift...">
                     </div>
                     <label class="stat-button">
-                        <input type="checkbox" id="addLunchCheckbox" style="width: 20px; height: 20px; accent-color: var(--primary-color); cursor: pointer;">
+                        <input type="checkbox" id="addLunchCheckbox"
+                            style="width: 20px; height: 20px; accent-color: var(--primary-color); cursor: pointer;">
                         Add Lunch
                     </label>
                     <button id="btnEmployeeTotal" class="stat-button" onclick="employeewiseTotalHours()"
@@ -96,13 +122,19 @@
                     <button id="btnSkillTotal" class="stat-button" onclick="skillwiseTotalHours()"
                         style="display: none;">Skill Total</button>
                     <button id="btnExitAggregate" class="stat-button" onclick="reprocessData()"
-                        style="display: none; background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; font-weight: bold;">✕ Close</button>
-                    
+                        style="display: none; background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; font-weight: bold;">✕
+                        Close</button>
+
                     <div class="column-picker-container" style="position: relative; display: flex;">
                         <button id="columnPickerBtn" class="stat-button">
-                            Columns <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M3 12h18"/></svg>
+                            Columns <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 3v18" />
+                                <path d="M3 12h18" />
+                            </svg>
                         </button>
-                        <div id="columnPickerDropdown" class="column-dropdown" style="display: none; position: absolute;">
+                        <div id="columnPickerDropdown" class="column-dropdown"
+                            style="display: none; position: absolute;">
                             <!-- Checkboxes injected by script.js -->
                         </div>
                     </div>
@@ -163,7 +195,11 @@
 
         <footer class="footer">
             <div class="footer-content">
-                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="footer-icon"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round"
+                    stroke-linejoin="round" class="footer-icon">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
                 <span class="footer-email">alqama.hasnain@tatasteel.com</span>
                 <span class="footer-brand">FMM-INFRA</span>
             </div>

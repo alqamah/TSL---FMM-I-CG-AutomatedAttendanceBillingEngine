@@ -1,6 +1,7 @@
 // Core Application Logic for Working Hours Calculator
 
-const fileInput = document.getElementById('fileInput');
+const attendeeFileInput = document.getElementById('attendeeFileInput');
+const punchFileInput = document.getElementById('punchFileInput');
 const statusSection = document.getElementById('statusSection');
 const fileStatusList = document.getElementById('fileStatusList');
 const fileCountBadge = document.getElementById('fileCountBadge');
@@ -192,7 +193,8 @@ updateColumnVisibility();
 // FILE UPLOAD
 // -----------------------------------------------
 // Listen for file selections
-fileInput.addEventListener('change', handleFileSelect);
+if (attendeeFileInput) attendeeFileInput.addEventListener('change', handleFileSelect);
+if (punchFileInput) punchFileInput.addEventListener('change', handlePunchFileSelect);
 exportBtn.addEventListener('click', exportToExcel);
 if (searchInput) searchInput.addEventListener('input', renderTable);
 if (addLunchCheckbox) addLunchCheckbox.addEventListener('change', reprocessData);
@@ -403,6 +405,240 @@ async function processFile(file) {
 
     } catch (err) {
         console.error('processFile error:', err);
+        statusItem.classList.add('error');
+        statusItem.querySelector('.status-text').textContent = 'Failed';
+    }
+}
+
+//punch file alternative upload
+async function handlePunchFileSelect(event) {
+    try {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+
+        statusSection.style.display = 'block';
+
+        fileStatusList.innerHTML = '';
+        employeeData = [];
+        tableBody.innerHTML = ''; 
+
+        fileCountBadge.textContent = `${files.length} File${files.length > 1 ? 's' : ''}`;
+
+        for (const file of files) {
+            await processPunchFile(file);
+        }
+
+        renderTable();
+
+        if (employeeData.length > 0) {
+            exportBtn.disabled = false;
+            const btnEmployeeTotal = document.getElementById('btnEmployeeTotal');
+            const btnSkillTotal = document.getElementById('btnSkillTotal');
+            if (btnEmployeeTotal) btnEmployeeTotal.style.display = 'block';
+            if (btnSkillTotal) btnSkillTotal.style.display = 'block';
+        }
+    } catch (err) {
+        console.error('handlePunchFileSelect error:', err);
+    }
+}
+
+async function processPunchFile(file) {
+    const statusItem = document.createElement('li');
+    statusItem.className = 'status-item';
+    statusItem.innerHTML = `
+        <span class="file-name">${file.name}</span>
+        <span class="status-text">Processing...</span>
+    `;
+    fileStatusList.appendChild(statusItem);
+
+    try {
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        const rawJsonArray = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+        const employeePunches = {};
+
+        for (let i = 0; i < rawJsonArray.length; i++) {
+            const row = rawJsonArray[i];
+            const dateStr = String(row[0] || '').trim();
+            const spNo = String(row[1] || '').trim();
+            if (!spNo || spNo.toLowerCase().includes('pass')) continue;
+
+            const name = String(row[3] || '').trim();
+            const vendorName = String(row[5] || '').trim();
+            const deptName = String(row[6] || '').trim();
+            const workorderNo = String(row[7] || '').trim();
+            const flag = String(row[9] || '').trim().toLowerCase(); 
+            const punchTimeStr = String(row[10] || '').trim();
+            
+            if (!punchTimeStr) continue;
+            
+            if (!employeePunches[spNo]) {
+                employeePunches[spNo] = { 
+                    allPunches: [],
+                    name: name,
+                    vendorName: vendorName,
+                    deptName: deptName,
+                    workorderNo: workorderNo,
+                    fallbackDate: dateStr
+                };
+            }
+            employeePunches[spNo].allPunches.push({ flag, time: punchTimeStr });
+        }
+
+        const dateMatch = file.name.match(/(\d{1,2}[-\s/]\d{1,2}[-\s/]\d{2,4})/);
+        let normalizedDate = dateMatch ? normalizeDate(dateMatch[1]) : 'N/A';
+        let fileDateFound = !!dateMatch;
+
+        const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
+        const processedRows = [];
+        
+        function extractTime(tStr) {
+            const tMatch = String(tStr).match(/(\d{1,2})[.:](\d{2})(?:[.:](\d{2}))?\s*([aApP][mM])?/);
+            if (tMatch) {
+                let h = parseInt(tMatch[1]);
+                const m = tMatch[2];
+                const ampm = tMatch[4] ? tMatch[4].toUpperCase() : null;
+                if (ampm === 'PM' && h < 12) h += 12;
+                if (ampm === 'AM' && h === 12) h = 0;
+                return `${String(h).padStart(2, '0')}:${m}`;
+            }
+            const num = parseFloat(tStr);
+            if (!isNaN(num) && num >= 0 && num < 1 && String(tStr).indexOf(':') === -1) {
+                const totalMins = Math.round(num * 24 * 60);
+                return formatMinutesTo24h(totalMins);
+            }
+            return String(tStr);
+        }
+        
+        function extractDate(tStr) {
+             const dateM = String(tStr).match(/(\d{1,2})[-\s/](\d{1,2})[-\s/](\d{2,4})/);
+             if (dateM) return normalizeDate(dateM[0]);
+             return null;
+        }
+
+        for (const spNo in employeePunches) {
+            const data = employeePunches[spNo];
+            
+            let firstIn = null;
+            let lastOut = null;
+            
+            let hasInFlag = data.allPunches.some(p => p.flag.includes('in') || p.flag === 'i' || p.flag === '1');
+            let hasOutFlag = data.allPunches.some(p => p.flag.includes('out') || p.flag === 'o' || p.flag === '0');
+            
+            if (hasInFlag || hasOutFlag) {
+                const ins = data.allPunches.filter(p => p.flag.includes('in') || p.flag === 'i' || p.flag === '1');
+                const outs = data.allPunches.filter(p => !p.flag.includes('in') && (p.flag.includes('out') || p.flag === 'o' || p.flag === '0'));
+                
+                if (ins.length > 0) firstIn = ins[0].time;
+                if (outs.length > 0) lastOut = outs[outs.length - 1].time;
+            } else {
+                 firstIn = data.allPunches[0]?.time;
+                 if (data.allPunches.length > 1) {
+                     lastOut = data.allPunches[data.allPunches.length - 1].time;
+                 } else {
+                     lastOut = 'N/A';
+                 }
+            }
+            
+            if (!fileDateFound && data.fallbackDate) {
+               const d = extractDate(data.fallbackDate);
+               if (d) { 
+                   normalizedDate = d;
+                   fileDateFound = true;
+               } else { 
+                   normalizedDate = data.fallbackDate;
+               }
+            }
+
+            const inTimeStr = firstIn ? extractTime(firstIn) : 'N/A';
+            const outTimeStr = lastOut && lastOut !== 'N/A' ? extractTime(lastOut) : 'N/A';
+            
+            const inMins = parseTimeFormatToMinutes(inTimeStr);
+            const outMins = parseTimeFormatToMinutes(outTimeStr);
+
+            const inTime = inMins !== null ? formatMinutesTo24h(inMins) : inTimeStr;
+            const outTime = outMins !== null ? formatMinutesTo24h(outMins) : outTimeStr;
+
+            let empName = data.name || spNo;
+            let vendor_name = data.vendorName || '';
+            let workorder_no = data.workorderNo || '';
+            let dept_name = data.deptName || '';
+            
+            let skillVal = null;
+            let designationVal = null;
+            let shiftsAllowedVal = [];
+            let inOtAllowed = false;
+            let outOtAllowed = false;
+
+            if (typeof employee_details !== 'undefined') {
+                const empDetails = employee_details.find(e => e.sp_no === spNo);
+                if (empDetails) {
+                    empName = empDetails.name || empName;
+                    skillVal = empDetails.skill || null;
+                    designationVal = empDetails.designation || null;
+                    shiftsAllowedVal = empDetails.allowedShifts || [];
+                    inOtAllowed = !!empDetails.inOtAllowed;
+                    outOtAllowed = !!empDetails.outOtAllowed;
+                }
+            }
+
+            const shift = assignShift(spNo, inTime, outTime);
+            let shiftIn = '';
+            let shiftOut = '';
+            let shiftInMins = null;
+            let shiftOutMins = null;
+
+            if (shift && SHIFT_DEFINITIONS[shift]) {
+                shiftIn = SHIFT_DEFINITIONS[shift].shiftIn;
+                shiftOut = SHIFT_DEFINITIONS[shift].shiftOut;
+                shiftInMins = parseTimeFormatToMinutes(shiftIn);
+                shiftOutMins = parseTimeFormatToMinutes(shiftOut);
+            }
+
+            const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
+            const formattedDutyIn = dutyInMins !== null ? formatMinutesTo24h(dutyInMins) : '';
+            const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
+
+            const dutyHours = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
+            const otHours = calculateOtHours(spNo, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
+            const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
+
+            processedRows.push({
+                date: normalizedDate,
+                sp_no: spNo,
+                name: empName,
+                vendor_name: vendor_name,
+                workorder_no: workorder_no,
+                dept_name: dept_name,
+                section: '',
+                skill: skillVal,
+                inOT: inOtAllowed,
+                outOT: outOtAllowed,
+                designation: designationVal,
+                shiftsAllowed: shiftsAllowedVal,
+                shift: shift,
+                shiftIn: shiftIn,
+                shiftOut: shiftOut,
+                punchIn: inTime,
+                punchOut: outTime,
+                dutyIn: formattedDutyIn,
+                dutyOut: formattedDutyOut,
+                addLunch: addLunch,
+                dutyHours: parseFloat(dutyHours.toFixed(2)),
+                otHours: parseFloat(otHours.toFixed(2)),
+                totalHours: totalHours
+            });
+        }
+        
+        employeeData = employeeData.concat(processedRows);
+
+        statusItem.classList.add('success');
+        statusItem.querySelector('.status-text').textContent = 'Success';
+    } catch (err) {
+        console.error('processPunchFile error:', err);
         statusItem.classList.add('error');
         statusItem.querySelector('.status-text').textContent = 'Failed';
     }
