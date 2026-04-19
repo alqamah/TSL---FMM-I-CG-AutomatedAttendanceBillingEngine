@@ -1,0 +1,43 @@
+Fix shift allocation for w1.  ✅
+Add search bar
+Add download btn
+
+correct the logic for night shift ✅
+wrong output 
+32	03-02-2026	VD0722561172	RUPESH KUMAR	B445	U			18:34	06:02	19:00	06:00	0	0	0
+
+
+Drivers:
+//Chottu Lohar
+
+1. Sujit Kr. Vishwakarma - RD0721287965
+2. Nalin Mahato - RD0918134974
+3. Rupesh Kumar -VD0722561172
+4. Laxman Bhaduk - RW0305045827
+5. Raju Kalindi - RD1203000744
+6. Nipen Ch. Shukul - RW0807096365
+
+Perform search only on Name, ID and Date
+
+v3.0
+05/03: ✅
+1. shift allocation logic for drivers is not working for C Shift + OT. Need to hardcode the shift allocation for C shift wrt duty in-out time.
+2. for shifts G and W1, deduct 1h lunch from duty hours.
+
+
+v3.5
+18/03:
+1. Assign Shift based on nearest time. Do not consider CLM. -> use mean of nearest time else, 1h+ for far-away shifts. ✅
+2. Use allowed shifts array. ✅
+3. Sort date in final report. ✅
+
+v4
+19/03:
+1. Allow OT based on allowedOT array for IN and/or OUT. Implement this in hours calculation logic. ✅
+2. Separate OT calc. function. ✅
+3. persistent data alternative: create an xlsx downloadable table containing
+    SP_NO, NAME, SKILL, DESIGNATION, ALLOWED_SHIFTS, ALLOWED_OT_IN, ALLOWED_OT_OUT
+    Create an upload section to upload this xlsx file. Bypass the persistent data and use uploaded data after cleaning it. 
+
+
+Adding PIPO files read

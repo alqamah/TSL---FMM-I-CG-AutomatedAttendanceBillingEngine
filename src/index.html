@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Working Hours Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-group">
+                    <img src="../assets/logo2.svg" alt="App Logo" class="app-logo">
+                    <h1>Working Hours Calculator</h1>
+                </div>
+                <p>FMM-INFRA, Crane Group</p>
+            </div>
+            <div class="header-actions">
+                <button id="exportBtn" class="btn btn-primary" disabled>
+                    <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round"
+                        stroke-linejoin="round" height="16" width="16" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Export XLSX</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <section class="upload-section">
+                <label class="upload-card" for="fileInput" id="upload-presentee">
+                    <div class="upload-icon">
+                        <img src="../assets/1.png" alt="App Logo" class="app-logo clm-logo">
+                    </div>
+                    <h3>Upload the CLM-Presentee Report here</h3>
+                    <!-- <label for="fileInput" class="btn btn-outline">Browse Files</label> -->
+                    <input type="file" id="fileInput" accept=".xls,.xlsx" multiple hidden>
+                </label>
+
+                <label class="upload-card" for="pipoInput" id="upload-pipo">
+                    <div class="upload-icon">
+                        <img src="../assets/2.png" alt="App Logo" class="app-logo clm-logo">
+                    </div>
+                    <h3>Upload the CLM-Punch Records Report here</h3>
+                    <!-- <label for="pipoInput" class="btn btn-outline">Browse Files</label> -->
+                    <input type="file" id="pipoInput" accept=".xls,.xlsx" multiple hidden>
+                </label>
+            </section>
+
+            <section class="status-section" id="statusSection" style="display: none;">
+                <div class="status-card">
+                    <div class="status-header">
+                        <h3>File Processing</h3>
+                        <span id="fileCountBadge" class="badge">0 files</span>
+                    </div>
+                    <ul id="fileStatusList" class="status-list">
+                    </ul>
+                </div>
+            </section>
+
+            <section class="data-section">
+                <div class="data-controls">
+                    <div class="search-box">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                            class="search-icon">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="searchInput" placeholder="Search by name, pass, vendor, or shift...">
+                    </div>
+                    <label class="stat-button">
+                        <input type="checkbox" id="addLunchCheckbox"
+                            style="width: 20px; height: 20px; accent-color: var(--primary-color); cursor: pointer;">
+                        Add Lunch
+                    </label>
+                    <button id="btnEmployeeTotal" class="stat-button" onclick="employeewiseTotalHours()"
+                        style="display: none;">Employee Total</button>
+                    <button id="btnSkillTotal" class="stat-button" onclick="skillwiseTotalHours()"
+                        style="display: none;">Skill Total</button>
+                    <button id="btnExitAggregate" class="stat-button" onclick="reprocessData()"
+                        style="display: none; background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; font-weight: bold;">✕
+                        Close</button>
+
+                    <div class="column-picker-container" style="position: relative; display: flex;">
+                        <button id="columnPickerBtn" class="stat-button">
+                            Columns <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 3v18" />
+                                <path d="M3 12h18" />
+                            </svg>
+                        </button>
+                        <div id="columnPickerDropdown" class="column-dropdown"
+                            style="display: none; position: absolute;">
+                            <!-- Checkboxes injected by script.js -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>SN</th>
+                                <th>DATE</th>
+                                <th>SP NO</th>
+                                <th class="highlight-header">NAME</th>
+                                <th class="highlight-header">PUNCH IN</th>
+                                <th class="highlight-header">PUNCH OUT</th>
+                                <th class="highlight-header">TOTAL HRS</th>
+                                <th>DUTY HRS</th>
+                                <th>OT HRS</th>
+                                <th>ADD LUNCH</th>
+                                <th>SHIFTS ALLOWED</th>
+                                <th>SHIFT</th>
+                                <th>SHIFT IN</th>
+                                <th>SHIFT OUT</th>
+                                <th>DUTY IN</th>
+                                <th>DUTY OUT</th>
+                                <th>SKILL</th>
+                                <th>IN-OT</th>
+                                <th>OUT-OT</th>
+                                <th>DESIGNATION</th>
+                                <th>VENDOR NAME</th>
+                                <th>WORKORDER NO</th>
+                                <th>DEPT NAME</th>
+                                <th>SECTION</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr class="empty-state-row">
+                                <td colspan="24">
+                                    <div class="empty-state">
+                                        <div class="empty-state-icon">
+                                            <svg stroke="currentColor" fill="none" stroke-width="1.5"
+                                                viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"
+                                                height="42" width="42" xmlns="http://www.w3.org/2000/svg">
+                                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                                                <polyline points="2 17 12 22 22 17"></polyline>
+                                                <polyline points="2 12 12 17 22 12"></polyline>
+                                            </svg>
+                                        </div>
+                                        <p>No data available</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="footer-content">
+                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round"
+                    stroke-linejoin="round" class="footer-icon">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
+                <span class="footer-email">alqama.hasnain@tatasteel.com</span>
+                <span class="footer-brand">FMM-INFRA</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="persistent_data.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
