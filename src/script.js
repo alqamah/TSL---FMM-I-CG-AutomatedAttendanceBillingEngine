@@ -193,14 +193,45 @@ updateColumnVisibility();
 // FILE UPLOAD
 // -----------------------------------------------
 // Listen for file selections
-fileInput.addEventListener('change', handleFileSelect);
+fileInput.addEventListener('change', handlePresenteeFileSelect);
 if (pipoInput) pipoInput.addEventListener('change', handlePipoFileSelect);
 exportBtn.addEventListener('click', exportToExcel);
 if (searchInput) searchInput.addEventListener('input', renderTable);
 if (addLunchCheckbox) addLunchCheckbox.addEventListener('change', reprocessData);
 
+// PIPO FILE UPLOAD HANDLER
+async function handlePipoFileSelect(event) {
+    try {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+
+        statusSection.style.display = 'block';
+        fileStatusList.innerHTML = '';
+        employeeData = [];
+        tableBody.innerHTML = '';
+
+        fileCountBadge.textContent = `${files.length} File${files.length > 1 ? 's' : ''}`;
+
+        for (const file of files) {
+            await processPipoFile(file);
+        }
+
+        renderTable();
+
+        if (employeeData.length > 0) {
+            exportBtn.disabled = false;
+            const btnEmployeeTotal = document.getElementById('btnEmployeeTotal');
+            const btnSkillTotal = document.getElementById('btnSkillTotal');
+            if (btnEmployeeTotal) btnEmployeeTotal.style.display = 'block';
+            if (btnSkillTotal) btnSkillTotal.style.display = 'block';
+        }
+    } catch (err) {
+        console.error('handlePipoFileSelect error:', err);
+    }
+}
+
 //file upload
-async function handleFileSelect(event) {
+async function handlePresenteeFileSelect(event) {
     try {
         const files = Array.from(event.target.files);
         if (!files.length) return;
@@ -215,7 +246,7 @@ async function handleFileSelect(event) {
         fileCountBadge.textContent = `${files.length} File${files.length > 1 ? 's' : ''}`;
 
         for (const file of files) {
-            await processFile(file);
+            await processPresenteeFile(file);
         }
 
         // Render the processed data
@@ -410,36 +441,6 @@ async function processPresenteeFile(file) {
     }
 }
 
-// PIPO FILE UPLOAD HANDLER
-async function handlePipoFileSelect(event) {
-    try {
-        const files = Array.from(event.target.files);
-        if (!files.length) return;
-
-        statusSection.style.display = 'block';
-        fileStatusList.innerHTML = '';
-        employeeData = [];
-        tableBody.innerHTML = '';
-
-        fileCountBadge.textContent = `${files.length} File${files.length > 1 ? 's' : ''}`;
-
-        for (const file of files) {
-            await processPipoFile(file);
-        }
-
-        renderTable();
-
-        if (employeeData.length > 0) {
-            exportBtn.disabled = false;
-            const btnEmployeeTotal = document.getElementById('btnEmployeeTotal');
-            const btnSkillTotal = document.getElementById('btnSkillTotal');
-            if (btnEmployeeTotal) btnEmployeeTotal.style.display = 'block';
-            if (btnSkillTotal) btnSkillTotal.style.display = 'block';
-        }
-    } catch (err) {
-        console.error('handlePipoFileSelect error:', err);
-    }
-}
 
 // PIPO FILE PROCESSING
 // Handles punch-in/punch-out raw records with columns:
@@ -463,19 +464,18 @@ async function processPipoFile(file) {
         // Convert to array-of-arrays to locate header row
         const rawJsonArray = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
-        // ---------- 1. Find header row ----------
-        // Look for a row that contains 'Safety Pass No' and 'Flag'
+        // Look for a row that contains 'Safety No' or 'Safety Pass No' and 'Flag'
         let headerRowIndex = -1;
         for (let i = 0; i < rawJsonArray.length; i++) {
             const rowStr = rawJsonArray[i].join('').toLowerCase().replace(/\s+/g, '').replace(/-/g, '').replace(/\//g, '');
-            if (rowStr.includes('safetypassno') && (rowStr.includes('flag') || rowStr.includes('punchtime'))) {
+            if ((rowStr.includes('safetypassno') || rowStr.includes('safetyno')) && (rowStr.includes('flag') || rowStr.includes('punchtime'))) {
                 headerRowIndex = i;
                 break;
             }
         }
 
         if (headerRowIndex === -1) {
-            throw new Error('Could not identify the header row. Expected columns: Safety Pass No, Flag, Punch Time/HH:MM:SS');
+            throw new Error('Could not identify the header row. Expected columns: Safety No. (or Safety Pass No), Flag, Punch Time/HH:MM:SS');
         }
 
         // ---------- 2. Parse rows into data objects ----------
@@ -488,6 +488,8 @@ async function processPipoFile(file) {
         dataRows.forEach(row => {
             // Resolve Safety Pass No column
             const spNo = String(
+                row['Safety No.'] ||
+                row['Safety No'] ||
                 row['Safety Pass No'] ||
                 row['Safety Pass No.'] ||
                 row['SafetyPassNo'] ||
@@ -542,13 +544,13 @@ async function processPipoFile(file) {
         const processedRows = [];
 
         Object.entries(pipo_records).forEach(([spNo, rec]) => {
-            const inTimes  = rec.IN  || [];
+            const inTimes = rec.IN || [];
             const outTimes = rec.OUT || [];
 
-            const inPunchMins  = inTimes.length  ? Math.min(...inTimes)  : null;
+            const inPunchMins = inTimes.length ? Math.min(...inTimes) : null;
             const outPunchMins = outTimes.length ? Math.max(...outTimes) : null;
 
-            const inTime  = inPunchMins  !== null ? formatMinutesTo24h(inPunchMins)  : '';
+            const inTime = inPunchMins !== null ? formatMinutesTo24h(inPunchMins) : '';
             const outTime = outPunchMins !== null ? formatMinutesTo24h(outPunchMins) : '';
 
             const normalizedDate = rec.date ? normalizeDate(rec.date) : '';
@@ -556,22 +558,22 @@ async function processPipoFile(file) {
             const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
 
             // ---------- 5. Enrich from persistent employee_details ----------
-            let skillVal        = null;
-            let designationVal  = null;
-            let shiftsAllowedVal= [];
-            let inOtAllowed     = false;
-            let outOtAllowed    = false;
-            let nameVal         = '';
+            let skillVal = null;
+            let designationVal = null;
+            let shiftsAllowedVal = [];
+            let inOtAllowed = false;
+            let outOtAllowed = false;
+            let nameVal = '';
 
             if (typeof employee_details !== 'undefined') {
                 const empDetails = employee_details.find(e => e.sp_no === spNo);
                 if (empDetails) {
-                    skillVal         = empDetails.skill         || null;
-                    designationVal   = empDetails.designation   || null;
+                    skillVal = empDetails.skill || null;
+                    designationVal = empDetails.designation || null;
                     shiftsAllowedVal = empDetails.allowedShifts || [];
-                    inOtAllowed      = !!empDetails.inOtAllowed;
-                    outOtAllowed     = !!empDetails.outOtAllowed;
-                    nameVal          = empDetails.name          || '';
+                    inOtAllowed = !!empDetails.inOtAllowed;
+                    outOtAllowed = !!empDetails.outOtAllowed;
+                    nameVal = empDetails.name || '';
                 }
             }
 
@@ -581,47 +583,47 @@ async function processPipoFile(file) {
             let shiftInMins = null, shiftOutMins = null;
 
             if (shift && SHIFT_DEFINITIONS[shift]) {
-                shiftIn      = SHIFT_DEFINITIONS[shift].shiftIn;
-                shiftOut     = SHIFT_DEFINITIONS[shift].shiftOut;
-                shiftInMins  = parseTimeFormatToMinutes(shiftIn);
+                shiftIn = SHIFT_DEFINITIONS[shift].shiftIn;
+                shiftOut = SHIFT_DEFINITIONS[shift].shiftOut;
+                shiftInMins = parseTimeFormatToMinutes(shiftIn);
                 shiftOutMins = parseTimeFormatToMinutes(shiftOut);
             }
 
             // ---------- 7. Duty In / Duty Out ----------
             const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
-            const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
+            const formattedDutyIn = dutyInMins !== null ? formatMinutesTo24h(dutyInMins) : '';
             const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
 
             // ---------- 8. Hours ----------
-            const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
-            const otHours    = calculateOtHours(spNo, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
+            const dutyHours = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
+            const otHours = calculateOtHours(spNo, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
             const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
-
             processedRows.push({
-                date:         normalizedDate,
-                sp_no:        spNo,
-                name:         nameVal,
-                vendor_name:  '',
+                date: normalizedDate,
+                sp_no: spNo,
+                name: nameVal,
+                vendor_name: '',
                 workorder_no: '',
-                dept_name:    '',
-                section:      '',
-                skill:        skillVal,
-                inOT:         inOtAllowed,
-                outOT:        outOtAllowed,
-                designation:  designationVal,
-                shiftsAllowed:shiftsAllowedVal,
-                shift:        shift,
-                shiftIn:      shiftIn,
-                shiftOut:     shiftOut,
-                punchIn:      inTime,
-                punchOut:     outTime,
-                dutyIn:       formattedDutyIn,
-                dutyOut:      formattedDutyOut,
-                addLunch:     addLunch,
-                dutyHours:    parseFloat(dutyHours.toFixed(2)),
-                otHours:      parseFloat(otHours.toFixed(2)),
-                totalHours:   totalHours
+                dept_name: '',
+                section: '',
+                skill: skillVal,
+                inOT: inOtAllowed,
+                outOT: outOtAllowed,
+                designation: designationVal,
+                shiftsAllowed: shiftsAllowedVal,
+                shift: shift,
+                shiftIn: shiftIn,
+                shiftOut: shiftOut,
+                punchIn: inTime,
+                punchOut: outTime,
+                dutyIn: formattedDutyIn,
+                dutyOut: formattedDutyOut,
+                addLunch: addLunch,
+                dutyHours: parseFloat(dutyHours.toFixed(2)),
+                otHours: parseFloat(otHours.toFixed(2)),
+                totalHours: totalHours
             });
+
         });
 
         // Append to master list
