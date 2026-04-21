@@ -68,12 +68,11 @@ body {
 .app-container {
     /* max-width: 1200px; */
     margin: 0 auto;
-    padding: 3rem 2rem;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    gap: 3rem;
     position: relative;
+    gap: 1rem;
 }
 
 /* Header */
@@ -179,24 +178,114 @@ body {
 
 /* Upload Section */
 .upload-section {
-    width: max-content;
-    margin: 0 auto;
+    margin-top: 1.5rem;
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
     gap: 2rem;
     justify-content: center;
-    align-items: flex-start;
+    align-items: flex-end;
 }
 
-/* Bypass Persistent Data checkbox */
-.bypass-persistent-data-wrapper {
+/* -----------------------------------------------
+   Master Upload Wrapper
+   Houses: Upload Master File btn + status badge + bypass checkbox
+   ----------------------------------------------- */
+.master-upload-wrapper {
     width: 100%;
     display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: center;
+    gap: 1rem;
     margin-top: -0.5rem;
 }
 
+/* Upload Master File button */
+.btn-master-upload {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.75rem 1.5rem;
+    background-color: #1a1a2e;
+    color: #e0e0ff;
+    font-family: var(--font-heading);
+    font-size: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-neubrutal);
+    cursor: pointer;
+    transition: var(--transition-neubrutal);
+    outline: none;
+    white-space: nowrap;
+}
+
+.btn-master-upload:hover {
+    background-color: #16213e;
+    box-shadow: var(--shadow-neubrutal-hover);
+    transform: translateY(2px) translateX(2px);
+}
+
+.btn-master-upload:active {
+    box-shadow: var(--shadow-none);
+    transform: translateY(4px) translateX(4px);
+}
+
+/* Status badge shown next to the button */
+.master-file-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.55rem 1.1rem;
+    border-radius: var(--radius-sm);
+    border: var(--border-width-sm) solid var(--border-color);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    box-shadow: 3px 3px 0px 0px #000;
+    white-space: nowrap;
+    transition: background-color 250ms ease, color 250ms ease;
+}
+
+.master-file-badge--idle {
+    background-color: #f1f5f9;
+    color: #64748b;
+}
+
+.master-file-badge--loading {
+    background-color: #fef9c3;
+    color: #92400e;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.master-file-badge--success {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.master-file-badge--error {
+    background-color: #fee2e2;
+    color: #991b1b;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.55;
+    }
+}
+
+/* Bypass Persistent Data checkbox */
 .bypass-checkbox-label {
     display: inline-flex;
     align-items: center;

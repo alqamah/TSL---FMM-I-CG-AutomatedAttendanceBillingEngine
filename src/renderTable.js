@@ -16,7 +16,14 @@ function renderTable() {
         const btnExit = document.getElementById('btnExitAggregate');
         if (btnExit) btnExit.style.display = 'none';
 
-        if (employeeData.length === 0) return;
+        const tableContainer = document.getElementById('tableContainer');
+        if (employeeData.length === 0) {
+            if (tableContainer) tableContainer.style.display = 'none';
+            return;
+        }
+
+        // Show the table container now that we have data
+        if (tableContainer) tableContainer.style.display = '';
 
         // Build sortable column headers
         const thead = document.querySelector('#dataTable thead');

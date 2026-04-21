@@ -19,7 +19,7 @@ Drivers Only
 // ];
 
 
-const employee_details = [
+let employee_details = [
     { sp_no: "RW0911182377", name: "SUJIT KR. VISHWAKARMA", designation: "driver", skill: "highly skilled", allowedShifts: ['A', 'G', 'C'], inOtAllowed: true, outOtAllowed: true },
     { sp_no: "RD0721287965", name: "NALIN MAHATO", designation: "driver", skill: "highly skilled", allowedShifts: ['A', 'G', 'C'], inOtAllowed: true, outOtAllowed: true },
     { sp_no: "RD0918134974", name: "RUPESH KUMAR", designation: "driver", skill: "highly skilled", allowedShifts: ['A', 'G', 'C'], inOtAllowed: true, outOtAllowed: true },
@@ -54,7 +54,7 @@ const employee_details = [
     { sp_no: "RW0911183405", name: "NARAYAN RAO", designation: "attender", skill: "semi skilled", allowedShifts: ['A', 'B', 'C'], inOtAllowed: false, outOtAllowed: true }
 ];
 
-const SHIFT_DEFINITIONS = {
+let SHIFT_DEFINITIONS = {
     'A': { shiftIn: '06:00', shiftOut: '14:00' },
     'B': { shiftIn: '14:00', shiftOut: '22:00' },
     'C': { shiftIn: '22:00', shiftOut: '06:00' },

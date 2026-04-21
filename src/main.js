@@ -262,3 +262,6 @@ if (pipoInput)          pipoInput.addEventListener('change',  handlePipoFileSele
 exportBtn.addEventListener('click',  exportToExcel);
 if (searchInput)        searchInput.addEventListener('input',  renderTable);
 if (addLunchCheckbox)   addLunchCheckbox.addEventListener('change', reprocessData);
+
+const masterFileInput = document.getElementById('masterFileInput');
+if (masterFileInput)    masterFileInput.addEventListener('change', handleMasterFileUpload);
