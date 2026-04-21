@@ -183,8 +183,59 @@ body {
     margin: 0 auto;
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     gap: 2rem;
+    justify-content: center;
+    align-items: flex-start;
 }
+
+/* Bypass Persistent Data checkbox */
+.bypass-persistent-data-wrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    margin-top: -0.5rem;
+}
+
+.bypass-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.65rem 1.5rem;
+    background-color: #fff3cd;
+    border: var(--border-width) solid var(--border-color);
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-neubrutal);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: var(--transition-neubrutal);
+    user-select: none;
+}
+
+.bypass-checkbox-label:hover {
+    box-shadow: var(--shadow-neubrutal-hover);
+    transform: translateY(2px) translateX(2px);
+    background-color: #ffe082;
+}
+
+.bypass-checkbox-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--text-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.bypass-checkbox-label:has(input:checked) {
+    background-color: #ffbdbd;
+    border-color: var(--accent-color);
+    box-shadow: 4px 4px 0px 0px var(--accent-color);
+}
+
 
 .upload-card {
     width: 40rem;

@@ -2,4 +2,4 @@
     SP_NO, NAME, SKILL, DESIGNATION, ALLOWED_SHIFTS, ALLOWED_OT_IN, ALLOWED_OT_OUT
     Create an upload section to upload this xlsx file. Bypass the persistent data and use uploaded data after cleaning it. 
 2. Add checkbox to bypass masterfile and use only uploaded data.
-3. Refactor the code, separation of concern
+3. Refactor the code, separation of concern.
