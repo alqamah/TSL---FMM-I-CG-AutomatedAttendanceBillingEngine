@@ -230,6 +230,7 @@ async function handlePipoFileSelect(event) {
     }
 }
 
+// PRESENTEE FILE PROCESSING
 //file upload
 async function handlePresenteeFileSelect(event) {
     try {
@@ -463,6 +464,7 @@ async function processPipoFile(file) {
 
         // Convert to array-of-arrays to locate header row
         const rawJsonArray = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+        console.log("Raw JSON Array:", rawJsonArray);
 
         // Look for a row that contains 'Safety No' or 'Safety Pass No' and 'Flag'
         let headerRowIndex = -1;
@@ -480,150 +482,164 @@ async function processPipoFile(file) {
 
         // ---------- 2. Parse rows into data objects ----------
         const dataRows = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex, defval: '' });
+        // console.log("Data Rows (parsed from Excel):", dataRows);
 
-        // ---------- 3. Build pipo_records: { safetyPassNo => { IN: [mins,...], OUT: [mins,...], date: str } } ----------
-        // Possible header names for each column (normalised comparison done below)
-        const pipo_records = {};
-
+        const tempMap = {};
         dataRows.forEach(row => {
-            // Resolve Safety Pass No column
-            const spNo = String(
-                row['Safety No.'] ||
-                row['Safety No'] ||
-                row['Safety Pass No'] ||
-                row['Safety Pass No.'] ||
-                row['SafetyPassNo'] ||
-                ''
-            ).trim();
+            let date = row['Date'] || '';
+            // Convert Excel serial date number to readable date string
+            if (typeof date === 'number') {
+                const utcDays = date - 25569; // Excel epoch to Unix epoch offset
+                const utcMs = utcDays * 86400 * 1000;
+                const d = new Date(utcMs);
+                const day = d.getUTCDate();
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                const mon = months[d.getUTCMonth()];
+                const year = String(d.getUTCFullYear()).slice(-2);
+                date = `${day}-${mon}-${year}`;
+            }
+            const spNo = row['Safety Pass No'] || row['Safety No.'] || '';
+            const flag = row['Flag'] || '';
+            const time = row['Punch Time/HH:MM:SS'] || row['Punch Time'] || '';
+            const vendorName = row['Vendor Name'] || '';
+            const workorderNo = row['Workorder No'] || '';
 
             if (!spNo) return;
 
-            // Resolve Flag column (IN / OUT)
-            const flag = String(
-                row['Flag'] ||
-                row['flag'] ||
-                ''
-            ).trim().toUpperCase();
-
-            // Resolve Punch Time column
-            const rawTime = String(
-                row['Punch Time/HH:MM:SS'] ||
-                row['Punch Time'] ||
-                row['PunchTime'] ||
-                row['Time'] ||
-                ''
-            ).trim();
-
-            // Resolve Date column (optional)
-            const rawDate = String(
-                row['Date'] ||
-                row['date'] ||
-                ''
-            ).trim();
-
-            const punchMins = parseTimeFormatToMinutes(rawTime);
-            if (punchMins === null || (!flag.startsWith('I') && !flag.startsWith('O'))) return;
-
-            const flagKey = flag.startsWith('I') ? 'IN' : 'OUT';
-
-            if (!pipo_records[spNo]) {
-                pipo_records[spNo] = { date: rawDate, IN: [], OUT: [] };
+            if (!tempMap[spNo]) {
+                tempMap[spNo] = {
+                    date: date,
+                    [spNo]: {},
+                    vendor_name: vendorName,
+                    workorder_no: workorderNo
+                };
             }
 
-            // Always keep the first non-empty date seen for this employee
-            if (!pipo_records[spNo].date && rawDate) {
-                pipo_records[spNo].date = rawDate;
+            if (flag) {
+                // we'll push into an array to handle multiple punches for the same flag
+                if (!tempMap[spNo][spNo][flag]) tempMap[spNo][spNo][flag] = [];
+                tempMap[spNo][spNo][flag].push(time);
             }
-
-            pipo_records[spNo][flagKey].push(punchMins);
         });
 
-        // ---------- 4. Derive punchIn / punchOut for each employee ----------
-        // punchIn  = smallest IN  time (first arrival)
-        // punchOut = largest  OUT time (last departure)
-        const processedRows = [];
+        const pipoRecords = Object.values(tempMap);
+        console.log("pipoRecords:", pipoRecords);
 
-        Object.entries(pipo_records).forEach(([spNo, rec]) => {
-            const inTimes = rec.IN || [];
-            const outTimes = rec.OUT || [];
+        const pipoEmployeeDetails = pipoRecords.map(record => {
+            const date = record.date;
+            const vendorName = record.vendor_name;
+            const workorderNo = record.workorder_no;
+            // The safety_pass_no is the other key in the record Object
+            const spNo = Object.keys(record).find(k => k !== 'date');
 
-            const inPunchMins = inTimes.length ? Math.min(...inTimes) : null;
-            const outPunchMins = outTimes.length ? Math.max(...outTimes) : null;
+            let punchIn = null;
+            let punchOut = null;
 
-            const inTime = inPunchMins !== null ? formatMinutesTo24h(inPunchMins) : '';
-            const outTime = outPunchMins !== null ? formatMinutesTo24h(outPunchMins) : '';
+            if (spNo && record[spNo]) {
+                const inTimes = record[spNo]['IN'] || [];
+                const outTimes = record[spNo]['OUT'] || [];
 
-            const normalizedDate = rec.date ? normalizeDate(rec.date) : '';
+                const validIn = inTimes.filter(t => t !== '').map(Number).filter(n => !isNaN(n));
+                const validOut = outTimes.filter(t => t !== '').map(Number).filter(n => !isNaN(n));
 
-            const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
-
-            // ---------- 5. Enrich from persistent employee_details ----------
-            let skillVal = null;
-            let designationVal = null;
-            let shiftsAllowedVal = [];
-            let inOtAllowed = false;
-            let outOtAllowed = false;
-            let nameVal = '';
-
-            if (typeof employee_details !== 'undefined') {
-                const empDetails = employee_details.find(e => e.sp_no === spNo);
-                if (empDetails) {
-                    skillVal = empDetails.skill || null;
-                    designationVal = empDetails.designation || null;
-                    shiftsAllowedVal = empDetails.allowedShifts || [];
-                    inOtAllowed = !!empDetails.inOtAllowed;
-                    outOtAllowed = !!empDetails.outOtAllowed;
-                    nameVal = empDetails.name || '';
+                if (validIn.length > 0) {
+                    punchIn = Math.min(...validIn);
+                }
+                if (validOut.length > 0) {
+                    punchOut = Math.max(...validOut);
                 }
             }
 
-            // ---------- 6. Assign shift ----------
-            const shift = assignShift(spNo, inTime, outTime);
+            return {
+                date: date,
+                sp_no: spNo,
+                punchIn: punchIn,
+                punchOut: punchOut,
+                vendorName: vendorName,
+                workorderNo: workorderNo
+            };
+        });
+
+        console.log("pipoEmployeeDetails:", pipoEmployeeDetails);
+
+        // ---------- Convert pipoEmployeeDetails into processedRows for employeeData ----------
+        const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
+        const processedRows = [];
+
+        pipoEmployeeDetails.forEach(emp => {
+            // Excel fractional-day → minutes → HH:MM string
+            const inTime  = (emp.punchIn  !== null) ? formatMinutesTo24h(Math.round(emp.punchIn  * 1440)) : '';
+            const outTime = (emp.punchOut !== null) ? formatMinutesTo24h(Math.round(emp.punchOut * 1440)) : '';
+
+            const normalizedDate = emp.date ? normalizeDate(emp.date) : '';
+
+            // Enrich from persistent employee_details
+            let skillVal        = null;
+            let designationVal  = null;
+            let shiftsAllowedVal = [];
+            let inOtAllowed     = false;
+            let outOtAllowed    = false;
+            let nameVal         = '';
+
+            if (typeof employee_details !== 'undefined') {
+                const empDetails = employee_details.find(e => e.sp_no === emp.sp_no);
+                if (empDetails) {
+                    skillVal         = empDetails.skill         || null;
+                    designationVal   = empDetails.designation   || null;
+                    shiftsAllowedVal = empDetails.allowedShifts || [];
+                    inOtAllowed      = !!empDetails.inOtAllowed;
+                    outOtAllowed     = !!empDetails.outOtAllowed;
+                    nameVal          = empDetails.name          || '';
+                }
+            }
+
+            // Assign shift
+            const shift = assignShift(emp.sp_no, inTime, outTime);
             let shiftIn = '', shiftOut = '';
             let shiftInMins = null, shiftOutMins = null;
 
             if (shift && SHIFT_DEFINITIONS[shift]) {
-                shiftIn = SHIFT_DEFINITIONS[shift].shiftIn;
-                shiftOut = SHIFT_DEFINITIONS[shift].shiftOut;
+                shiftIn     = SHIFT_DEFINITIONS[shift].shiftIn;
+                shiftOut    = SHIFT_DEFINITIONS[shift].shiftOut;
                 shiftInMins = parseTimeFormatToMinutes(shiftIn);
                 shiftOutMins = parseTimeFormatToMinutes(shiftOut);
             }
 
-            // ---------- 7. Duty In / Duty Out ----------
+            // Duty In / Duty Out
             const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
-            const formattedDutyIn = dutyInMins !== null ? formatMinutesTo24h(dutyInMins) : '';
+            const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
             const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
 
-            // ---------- 8. Hours ----------
-            const dutyHours = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
-            const otHours = calculateOtHours(spNo, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
+            // Hours
+            const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
+            const otHours    = calculateOtHours(emp.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
             const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
-            processedRows.push({
-                date: normalizedDate,
-                sp_no: spNo,
-                name: nameVal,
-                vendor_name: '',
-                workorder_no: '',
-                dept_name: '',
-                section: '',
-                skill: skillVal,
-                inOT: inOtAllowed,
-                outOT: outOtAllowed,
-                designation: designationVal,
-                shiftsAllowed: shiftsAllowedVal,
-                shift: shift,
-                shiftIn: shiftIn,
-                shiftOut: shiftOut,
-                punchIn: inTime,
-                punchOut: outTime,
-                dutyIn: formattedDutyIn,
-                dutyOut: formattedDutyOut,
-                addLunch: addLunch,
-                dutyHours: parseFloat(dutyHours.toFixed(2)),
-                otHours: parseFloat(otHours.toFixed(2)),
-                totalHours: totalHours
-            });
 
+            processedRows.push({
+                date:          normalizedDate,
+                sp_no:         emp.sp_no,
+                name:          nameVal,
+                vendor_name:   emp.vendorName   || '',
+                workorder_no:  emp.workorderNo  || '',
+                dept_name:     '',
+                section:       '',
+                skill:         skillVal,
+                inOT:          inOtAllowed,
+                outOT:         outOtAllowed,
+                designation:   designationVal,
+                shiftsAllowed: shiftsAllowedVal,
+                shift:         shift,
+                shiftIn:       shiftIn,
+                shiftOut:      shiftOut,
+                punchIn:       inTime,
+                punchOut:      outTime,
+                dutyIn:        formattedDutyIn,
+                dutyOut:       formattedDutyOut,
+                addLunch:      addLunch,
+                dutyHours:     parseFloat(dutyHours.toFixed(2)),
+                otHours:       parseFloat(otHours.toFixed(2)),
+                totalHours:    totalHours
+            });
         });
 
         // Append to master list
