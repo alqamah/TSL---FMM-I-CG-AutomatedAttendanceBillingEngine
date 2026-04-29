@@ -15,7 +15,7 @@ async function handlePipoFileSelect(event) {
         const files = Array.from(event.target.files);
         if (!files.length) return;
 
-        statusSection.style.display = 'block';
+        statusSection.classList.remove('is-hidden');
         fileStatusList.innerHTML    = '';
         employeeData                = [];
         tableBody.innerHTML         = '';
@@ -32,8 +32,8 @@ async function handlePipoFileSelect(event) {
             exportBtn.disabled = false;
             const btnEmployeeTotal = document.getElementById('btnEmployeeTotal');
             const btnSkillTotal    = document.getElementById('btnSkillTotal');
-            if (btnEmployeeTotal) btnEmployeeTotal.style.display = 'block';
-            if (btnSkillTotal)    btnSkillTotal.style.display    = 'block';
+            if (btnEmployeeTotal) btnEmployeeTotal.classList.remove('is-hidden');
+            if (btnSkillTotal)    btnSkillTotal.classList.remove('is-hidden');
         }
     } catch (err) {
         console.error('handlePipoFileSelect error:', err);
@@ -53,7 +53,7 @@ async function handlePresenteeFileSelect(event) {
         const files = Array.from(event.target.files);
         if (!files.length) return;
 
-        statusSection.style.display = 'block';
+        statusSection.classList.remove('is-hidden');
         fileStatusList.innerHTML    = '';
         employeeData                = [];
         tableBody.innerHTML         = '';
@@ -70,8 +70,8 @@ async function handlePresenteeFileSelect(event) {
             exportBtn.disabled = false;
             const btnEmployeeTotal = document.getElementById('btnEmployeeTotal');
             const btnSkillTotal    = document.getElementById('btnSkillTotal');
-            if (btnEmployeeTotal) btnEmployeeTotal.style.display = 'block';
-            if (btnSkillTotal)    btnSkillTotal.style.display    = 'block';
+            if (btnEmployeeTotal) btnEmployeeTotal.classList.remove('is-hidden');
+            if (btnSkillTotal)    btnSkillTotal.classList.remove('is-hidden');
         }
     } catch (err) {
         console.error('handlePresenteeFileSelect error:', err);

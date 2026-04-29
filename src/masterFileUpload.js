@@ -168,7 +168,7 @@ async function handleMasterFileUpload(event) {
         masterStatusEl.className   = `master-file-badge master-file-badge--${type}`;
     };
 
-    setStatus('Processing…', 'loading');
+    setStatus('Processing...', 'loading');
 
     try {
         const data     = await file.arrayBuffer();
@@ -230,11 +230,11 @@ async function handleMasterFileUpload(event) {
         console.log('[Master] Updated employee_details:', employee_details);
         console.log('[Master] Updated SHIFT_DEFINITIONS:', SHIFT_DEFINITIONS);
 
-        setStatus(`✓ ${file.name}`, 'success');
+        setStatus(`Loaded: ${file.name}`, 'success');
 
     } catch (err) {
         console.error('[Master File Upload] Error:', err);
-        setStatus(`✗ ${err.message}`, 'error');
+        setStatus(`Error: ${err.message}`, 'error');
     }
 
     // Reset input so the same file can be re-uploaded if needed

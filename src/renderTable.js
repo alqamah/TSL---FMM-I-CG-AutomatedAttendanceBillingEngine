@@ -14,16 +14,16 @@ function renderTable() {
     try {
         if (dataTable) dataTable.classList.add('main-view');
         const btnExit = document.getElementById('btnExitAggregate');
-        if (btnExit) btnExit.style.display = 'none';
+        if (btnExit) btnExit.classList.add('is-hidden');
 
         const tableContainer = document.getElementById('tableContainer');
         if (employeeData.length === 0) {
-            if (tableContainer) tableContainer.style.display = 'none';
+            if (tableContainer) tableContainer.classList.add('is-hidden');
             return;
         }
 
         // Show the table container now that we have data
-        if (tableContainer) tableContainer.style.display = '';
+        if (tableContainer) tableContainer.classList.remove('is-hidden');
 
         // Build sortable column headers
         const thead = document.querySelector('#dataTable thead');
@@ -31,12 +31,16 @@ function renderTable() {
             thead.innerHTML = `
                 <tr>
                     <th>SN</th>
-                    <th class="sortable-header" onclick="toggleSort('date')">
-                        DATE ${sortArrowsHtml('date')}
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="date" aria-label="Sort by date">
+                            DATE ${sortArrowsHtml('date')}
+                        </button>
                     </th>
                     <th>SP NO</th>
-                    <th class="sortable-header" onclick="toggleSort('name')">
-                        NAME ${sortArrowsHtml('name')}
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="name" aria-label="Sort by employee name">
+                            NAME ${sortArrowsHtml('name')}
+                        </button>
                     </th>
                     <th>PUNCH IN</th>
                     <th>PUNCH OUT</th>
@@ -44,23 +48,31 @@ function renderTable() {
                     <th>DUTY HRS</th>
                     <th>OT HRS</th>
                     <th>ADD LUNCH</th>
-                    <th class="sortable-header" onclick="toggleSort('shiftsAllowed')">
-                        SHIFTS ALLOWED ${sortArrowsHtml('shiftsAllowed')}
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="shiftsAllowed" aria-label="Sort by allowed shifts">
+                            SHIFTS ALLOWED ${sortArrowsHtml('shiftsAllowed')}
+                        </button>
                     </th>
-                    <th class="sortable-header" onclick="toggleSort('shift')">
-                        SHIFT ${sortArrowsHtml('shift')}
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="shift" aria-label="Sort by assigned shift">
+                            SHIFT ${sortArrowsHtml('shift')}
+                        </button>
                     </th>
                     <th>SHIFT IN</th>
                     <th>SHIFT OUT</th>
                     <th>DUTY IN</th>
                     <th>DUTY OUT</th>
-                    <th class="sortable-header" onclick="toggleSort('skill')">
-                        SKILL ${sortArrowsHtml('skill')}
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="skill" aria-label="Sort by skill">
+                            SKILL ${sortArrowsHtml('skill')}
+                        </button>
                     </th>
                     <th>IN-OT</th>
                     <th>OUT-OT</th>
-                    <th class="sortable-header" onclick="toggleSort('designation')">
-                        DESIGNATION ${sortArrowsHtml('designation')}
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="designation" aria-label="Sort by designation">
+                            DESIGNATION ${sortArrowsHtml('designation')}
+                        </button>
                     </th>
                     <th>VENDOR NAME</th>
                     <th>WORKORDER NO</th>
@@ -82,8 +94,8 @@ function renderTable() {
 
         // Apply active column sorts (stable sort: last toggled wins)
         const strCompare = (va, vb, order) => {
-            const sa  = String(va || '').toLowerCase();
-            const sb  = String(vb || '').toLowerCase();
+            const sa = String(va || '').toLowerCase();
+            const sb = String(vb || '').toLowerCase();
             const cmp = sa.localeCompare(sb);
             return order === 'asc' ? cmp : -cmp;
         };
@@ -95,9 +107,9 @@ function renderTable() {
                 return sortStates.date === 'asc' ? dateA - dateB : dateB - dateA;
             });
         }
-        if (sortStates.name         !== 'none') filteredData.sort((a, b) => strCompare(a.name,        b.name,        sortStates.name));
-        if (sortStates.skill        !== 'none') filteredData.sort((a, b) => strCompare(a.skill,       b.skill,       sortStates.skill));
-        if (sortStates.designation  !== 'none') filteredData.sort((a, b) => strCompare(a.designation, b.designation, sortStates.designation));
+        if (sortStates.name !== 'none') filteredData.sort((a, b) => strCompare(a.name, b.name, sortStates.name));
+        if (sortStates.skill !== 'none') filteredData.sort((a, b) => strCompare(a.skill, b.skill, sortStates.skill));
+        if (sortStates.designation !== 'none') filteredData.sort((a, b) => strCompare(a.designation, b.designation, sortStates.designation));
         if (sortStates.shiftsAllowed !== 'none') {
             filteredData.sort((a, b) => strCompare(
                 (a.shiftsAllowed || []).join(','),
@@ -122,6 +134,7 @@ function renderTable() {
 
         filteredData.forEach((row, index) => {
             const tr = document.createElement('tr');
+            const isUnexpectedShift = row.shiftsAllowed && !row.shiftsAllowed.includes(row.shift);
             tr.innerHTML = `
                 <td>${index + 1}</td>
                 <td title="date">${row.date || ''}</td>
@@ -134,7 +147,7 @@ function renderTable() {
                 <td title="ot-hrs">${row.otHours ?? ''}</td>
                 <td title="add-lunch">${row.addLunch ? 'Yes' : 'No'}</td>
                 <td title="shifts-allowed">${(row.shiftsAllowed || []).join(', ') || ''}</td>
-                <td title="shift"${(row.shiftsAllowed && !row.shiftsAllowed.includes(row.shift)) ? ' style="background-color: #E36A6A;"' : ''}>${row.shift || ''}</td>
+                <td title="${isUnexpectedShift ? 'Assigned shift is not in allowed shifts' : 'shift'}" class="${isUnexpectedShift ? 'flagged-shift' : ''}">${row.shift || ''}</td>
                 <td title="shift-in">${row.shiftIn || ''}</td>
                 <td title="shift-out">${row.shiftOut || ''}</td>
                 <td title="duty-in">${row.dutyIn || ''}</td>
@@ -224,19 +237,19 @@ function getEmployeeAggregatedData() {
             if (!aggregated[key]) {
                 aggregated[key] = {
                     'Safety Pass No': empId,
-                    'Employee Name':  row.name,
-                    'Total Hours':    0
+                    'Employee Name': row.name,
+                    'Total Hours': 0
                 };
             }
             aggregated[key]['Total Hours'] += (parseFloat(row.totalHours) || 0);
         });
 
         return Object.values(aggregated).map((item, index) => ({
-            'SL.NO.':         index + 1,
+            'SL.NO.': index + 1,
             'Safety Pass No': item['Safety Pass No'],
-            'Employee Name':  item['Employee Name'],
-            'Total Hours':    parseFloat(item['Total Hours'].toFixed(2)),
-            'Total Shifts':   parseFloat((item['Total Hours'] / 8).toFixed(2))
+            'Employee Name': item['Employee Name'],
+            'Total Hours': parseFloat(item['Total Hours'].toFixed(2)),
+            'Total Shifts': parseFloat((item['Total Hours'] / 8).toFixed(2))
         }));
     } catch (err) {
         console.error('getEmployeeAggregatedData error:', err);
@@ -260,10 +273,10 @@ function getSkillAggregatedData() {
         });
 
         return Object.keys(aggregated).map((skill, index) => ({
-            'SL.NO.':      index + 1,
+            'SL.NO.': index + 1,
             'Skill Level': skill,
             'Total Hours': parseFloat(aggregated[skill].toFixed(2)),
-            'Total Shifts':parseFloat((aggregated[skill] / 8).toFixed(2))
+            'Total Shifts': parseFloat((aggregated[skill] / 8).toFixed(2))
         }));
     } catch (err) {
         console.error('getSkillAggregatedData error:', err);
@@ -282,7 +295,7 @@ function employeewiseTotalHours() {
         if (resultData.length === 0) return;
         renderAggregatedTable(resultData, ['SL.NO.', 'Safety Pass No', 'Employee Name', 'Total Hours', 'Total Shifts']);
         const btnExit = document.getElementById('btnExitAggregate');
-        if (btnExit) btnExit.style.display = 'flex';
+        if (btnExit) btnExit.classList.remove('is-hidden');
     } catch (err) {
         console.error('employeewiseTotalHours error:', err);
     }
@@ -295,7 +308,7 @@ function skillwiseTotalHours() {
         if (resultData.length === 0) return;
         renderAggregatedTable(resultData, ['SL.NO.', 'Skill Level', 'Total Hours', 'Total Shifts']);
         const btnExit = document.getElementById('btnExitAggregate');
-        if (btnExit) btnExit.style.display = 'flex';
+        if (btnExit) btnExit.classList.remove('is-hidden');
     } catch (err) {
         console.error('skillwiseTotalHours error:', err);
     }

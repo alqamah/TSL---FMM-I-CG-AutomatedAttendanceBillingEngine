@@ -19,6 +19,11 @@ const addLunchCheckbox            = document.getElementById('addLunchCheckbox');
 const bypassPersistentDataCheckbox= document.getElementById('bypassPersistentDataCheckbox');
 const columnPickerBtn             = document.getElementById('columnPickerBtn');
 const columnPickerDropdown        = document.getElementById('columnPickerDropdown');
+const masterFileBtn               = document.getElementById('masterFileBtn');
+const masterFileInput             = document.getElementById('masterFileInput');
+const btnEmployeeTotal            = document.getElementById('btnEmployeeTotal');
+const btnSkillTotal               = document.getElementById('btnSkillTotal');
+const btnExitAggregate            = document.getElementById('btnExitAggregate');
 
 // -----------------------------------------------
 // SHARED STATE
@@ -145,8 +150,9 @@ if (columnPickerDropdown) {
 if (columnPickerBtn) {
     columnPickerBtn.addEventListener('click', e => {
         e.stopPropagation();
-        columnPickerDropdown.style.display =
-            columnPickerDropdown.style.display === 'none' ? 'flex' : 'none';
+        const isOpen = !columnPickerDropdown.classList.contains('is-hidden');
+        columnPickerDropdown.classList.toggle('is-hidden', isOpen);
+        columnPickerBtn.setAttribute('aria-expanded', String(!isOpen));
     });
 }
 // Close dropdown on outside click
@@ -156,7 +162,8 @@ document.addEventListener('click', e => {
         !columnPickerBtn.contains(e.target) &&
         !columnPickerDropdown.contains(e.target)
     ) {
-        columnPickerDropdown.style.display = 'none';
+        columnPickerDropdown.classList.add('is-hidden');
+        columnPickerBtn.setAttribute('aria-expanded', 'false');
     }
 });
 
@@ -201,7 +208,7 @@ function toggleDateSort() { toggleSort('date'); }
  * @returns {string} HTML string.
  */
 function sortArrowsHtml(col) {
-    return `<span class="sort-arrows">
+    return `<span class="sort-arrows" aria-hidden="true">
         <span class="sort-arrow up ${sortStates[col] === 'asc'  ? 'active' : ''}">▲</span>
         <span class="sort-arrow down ${sortStates[col] === 'desc' ? 'active' : ''}">▼</span>
     </span>`;
@@ -260,8 +267,19 @@ function reprocessData() {
 fileInput.addEventListener('change', handlePresenteeFileSelect);
 if (pipoInput)          pipoInput.addEventListener('change',  handlePipoFileSelect);
 exportBtn.addEventListener('click',  exportToExcel);
+if (dataTable) {
+    dataTable.addEventListener('click', event => {
+        const button = event.target.closest('[data-sort-key]');
+        if (!button) return;
+        toggleSort(button.dataset.sortKey);
+    });
+}
 if (searchInput)        searchInput.addEventListener('input',  renderTable);
 if (addLunchCheckbox)   addLunchCheckbox.addEventListener('change', reprocessData);
-
-const masterFileInput = document.getElementById('masterFileInput');
+if (masterFileBtn && masterFileInput) {
+    masterFileBtn.addEventListener('click', () => masterFileInput.click());
+}
 if (masterFileInput)    masterFileInput.addEventListener('change', handleMasterFileUpload);
+if (btnEmployeeTotal)   btnEmployeeTotal.addEventListener('click', employeewiseTotalHours);
+if (btnSkillTotal)      btnSkillTotal.addEventListener('click', skillwiseTotalHours);
+if (btnExitAggregate)   btnExitAggregate.addEventListener('click', reprocessData);

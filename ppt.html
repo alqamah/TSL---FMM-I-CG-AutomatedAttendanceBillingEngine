@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLM Attendance Reconciliation Tool</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+    <style>
+        :root {
+            --ts-blue: #003366;
+            --ts-blue-light: #004d99;
+            --ts-blue-dark: #001a33;
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-100: #f1f5f9;
+            --slate-50: #f8fafc;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --font-sans: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: #000;
+            color: var(--slate-900);
+            overflow-x: hidden;
+            scroll-snap-type: y mandatory;
+        }
+
+        /* Presentation Container */
+        .deck {
+            height: 100vh;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+        }
+
+        /* Generic Slide Layout */
+        .slide {
+            height: 100vh;
+            width: 100vw;
+            scroll-snap-align: start;
+            background-color: #ffffff;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            padding: 4rem 6rem;
+            overflow: hidden;
+        }
+
+        /* Slide Structural Elements */
+        .slide-header {
+            margin-bottom: 3rem;
+            border-bottom: 3px solid var(--ts-blue);
+            padding-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .slide-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--ts-blue);
+            text-transform: uppercase;
+            letter-spacing: -0.02em;
+        }
+
+        .slide-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* Background Accents */
+        .slide::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 12px;
+            height: 100%;
+            background: linear-gradient(to bottom, var(--ts-blue-light), var(--ts-blue-dark));
+        }
+
+        /* Typography */
+        h1 { font-size: 4rem; font-weight: 800; color: var(--ts-blue); line-height: 1.1; margin-bottom: 1rem; }
+        h2 { font-size: 2rem; font-weight: 600; color: var(--slate-800); margin-bottom: 1rem; }
+        p { font-size: 1.25rem; line-height: 1.6; color: var(--slate-800); margin-bottom: 1rem; }
+        .mono { font-family: var(--font-mono); font-size: 1.1rem; color: var(--ts-blue); background: var(--slate-100); padding: 0.2rem 0.5rem; border-radius: 4px; }
+        
+        /* Grid Layouts */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; }
+
+        /* Cards & Tiles */
+        .card {
+            background: var(--slate-50);
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 2rem;
+            height: 100%;
+            transition: transform 0.2s;
+        }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        .card .icon { font-size: 3rem; color: var(--ts-blue); margin-bottom: 1rem; }
+        .card h3 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--slate-900); }
+
+        /* Tables */
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; background: #fff; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
+        th { background: var(--ts-blue); color: #fff; font-weight: 600; text-align: left; padding: 1.2rem; font-size: 1.1rem; }
+        td { padding: 1.2rem; border-bottom: 1px solid #e2e8f0; font-size: 1.1rem; color: var(--slate-800); }
+        tr:last-child td { border-bottom: none; }
+        .bg-light-red { background-color: #fef2f2; }
+        .bg-light-green { background-color: #f0fdf4; }
+
+        /* Impact Section */
+        .impact-container { display: flex; justify-content: space-around; align-items: center; width: 100%; padding: 4rem 0; }
+        .impact-stat { text-align: center; }
+        .impact-number { font-size: 6rem; font-weight: 800; line-height: 1; }
+        .impact-number.bad { color: var(--slate-800); }
+        .impact-number.good { color: var(--ts-blue); }
+        .impact-label { font-size: 1.5rem; font-weight: 600; margin-top: 1rem; color: var(--slate-900); }
+        .impact-sub { font-size: 1rem; color: #64748b; max-width: 300px; margin: 0.5rem auto 0; }
+
+        /* Math Container */
+        .math-box { background: var(--slate-50); border-left: 4px solid var(--ts-blue); padding: 2rem; margin: 1.5rem 0; font-size: 1.5rem; }
+
+        /* Architecture Diagram Simulation */
+        .arch-layer { background: #fff; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; }
+        .arch-layer h3 { color: var(--ts-blue); margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+        
+        .logo-watermark { position: absolute; bottom: 2rem; right: 2rem; opacity: 0.1; font-size: 2rem; font-weight: 800; color: var(--ts-blue); }
+    </style>
+</head>
+<body>
+
+<div class="deck">
+
+    <section class="slide" style="justify-content: center; align-items: center; text-align: center; background: radial-gradient(circle at center, #ffffff 0%, #f1f5f9 100%);">
+        <span class="material-symbols-outlined" style="font-size: 5rem; color: var(--ts-blue); margin-bottom: 1rem;">memory</span>
+        <h1 style="font-size: 5rem;">Attendance Reconciliation<br>Automation System</h1>
+        <h2 style="color: var(--slate-800); font-weight: 400; margin-top: 1rem;">FMM-Infrastructure | Tata Steel</h2>
+        <div style="margin-top: 3rem; background: var(--ts-blue); color: white; padding: 0.5rem 1.5rem; border-radius: 20px; font-family: var(--font-mono);">
+            alqama.hasnain@tatasteel.com
+        </div>
+    </section>
+
+    <section class="slide">
+        <div class="slide-header">
+            <h2 class="slide-title">Background & Problem Statement</h2>
+        </div>
+        <div class="slide-content">
+            <p style="font-size: 1.5rem; font-weight: 600; border-left: 4px solid var(--accent-red); padding-left: 1rem; margin-bottom: 3rem;">
+                The Core Challenge: CLM generates raw punch logs, but native reports fail to reconcile complex billing requirements.
+            </p>
+            <div class="grid-4">
+                <div class="card">
+                    <span class="material-symbols-outlined icon" style="color: var(--accent-red);">assignment_late</span>
+                    <h3>Incorrect Shift Assignment</h3>
+                    <p>CLM systems fail to accurately map punches to scheduled shifts.</p>
+                </div>
+                <div class="card">
+                    <span class="material-symbols-outlined icon" style="color: var(--accent-red);">timer_off</span>
+                    <h3>Duty vs. OT Ambiguity</h3>
+                    <p>Lack of clear distinction between regular duty hours and overtime.</p>
+                </div>
+                <div class="card">
+                    <span class="material-symbols-outlined icon" style="color: var(--accent-red);">nights_stay</span>
+                    <h3>Cross-Midnight Logic</h3>
+                    <p>Failure to handle complex night-shift rotations accurately.</p>
+                </div>
+                <div class="card">
+                    <span class="material-symbols-outlined icon" style="color: var(--accent-red);">bar_chart</span>
+                    <h3>Billing Inefficiency</h3>
+                    <p>Absence of skill-wise aggregates required for vendor billing.</p>
+                </div>
+            </div>
+        </div>
+        <div class="logo-watermark">TATA STEEL</div>
+    </section>
+
+    <section class="slide">
+        <div class="slide-header">
+            <h2 class="slide-title">Project Objectives</h2>
+        </div>
+        <div class="slide-content">
+            <div class="grid-3">
+                <div class="card">
+                    <span class="material-symbols-outlined icon">cloud_upload</span>
+                    <h3>Seamless Ingestion</h3>
+                    <p>Accepts CLM attendance data (Presentee Report and Punch Records) directly via structured Excel <span class="mono">.xlsx</span> files.</p>
+                </div>
+                <div class="card">
+                    <span class="material-symbols-outlined icon">settings_suggest</span>
+                    <h3>Rule-Based Logic</h3>
+                    <p>Programmatically applies grace periods, late penalties, and OT eligibility based on employee-specific configuration profiles.</p>
+                </div>
+                <div class="card">
+                    <span class="material-symbols-outlined icon">request_quote</span>
+                    <h3>Billing Aggregates</h3>
+                    <p>Instantly generates structured skill-wise and employee-wise billing reports for payroll and vendor reconciliation.</p>
+                </div>
+            </div>
+        </div>
+        <div class="logo-watermark">TATA STEEL</div>
+    </section>
+
+    <section class="slide">
+        <div class="slide-header">
+            <h2 class="slide-title">Automatic Shift Assignment</h2>
+            <span class="material-symbols-outlined" style="font-size: 2.5rem; color: var(--ts-blue);">swap_calls</span>
+        </div>
+        <div class="slide-content">
+            <p style="font-size: 1.5rem; font-weight: 600; margin-bottom: 2rem;">Proximity Logic Overview</p>
+            <p style="margin-bottom: 3rem;">The system independently determines the correct shift by analyzing actual punch times, intentionally discarding flawed CLM-assigned data.</p>
+            
+            <div class="grid-2">
+                <div class="card" style="border-top: 4px solid var(--ts-blue);">
+                    <h3 style="color: var(--ts-blue); font-weight: 800;">Priority 1: Rotational</h3>
+                    <p><strong>A / B / C Shifts</strong></p>
+                    <p>Match evaluated within ±2 hours of shift start time. Used for primary rotational shifts to ensure tight alignment with standard scheduling windows.</p>
+                    <div style="margin-top: 1rem; padding: 0.5rem; background: var(--slate-100); border-radius: 4px;">
+                        <span class="material-symbols-outlined" style="vertical-align: middle; font-size: 1rem;">info</span> Includes sophisticated Cross-Midnight Handling for Night Shift (C).
+                    </div>
+                </div>
+                <div class="card" style="border-top: 4px solid var(--slate-800);">
+                    <h3 style="color: var(--slate-800); font-weight: 800;">Priority 2: General</h3>
+                    <p><strong>G / W1 Shifts</strong></p>
+                    <p>Evaluated via an average-difference score algorithm. Statistical evaluation for non-rotational shifts, calculating the least variance across the entire shift duration.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide">
+        <div class="slide-header">
+            <h2 class="slide-title">Duty-In Reconciliation Logic</h2>
+            <span class="material-symbols-outlined" style="font-size: 2.5rem; color: var(--ts-blue);">login</span>
+        </div>
+        <div class="slide-content">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Scenario</th>
+                        <th style="width: 45%;">Condition</th>
+                        <th style="width: 35%;">Assigned Duty-In</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Early OT</strong></td>
+                        <td>Arrived > 59 min early AND <span class="mono">inOtAllowed = true</span></td>
+                        <td>Rounded <strong>UP</strong> to next 30-minute mark</td>
+                    </tr>
+                    <tr class="bg-light-green">
+                        <td><strong>Grace</strong></td>
+                        <td>Arrived within 15 min late OR slightly early</td>
+                        <td><strong>Exact</strong> Shift Start Time</td>
+                    </tr>
+                    <tr class="bg-light-red">
+                        <td><strong>Penalty</strong></td>
+                        <td>Arrived > 15 min late</td>
+                        <td>Rounded <strong>UP</strong> to next 30-minute mark</td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <div style="margin-top: 3rem; background: var(--slate-50); padding: 1.5rem; border-radius: 8px; display: inline-block; border-left: 4px solid var(--ts-blue);">
+                <strong>Example Calculation:</strong> Shift 08:30 | Arrived 08:47 <span style="color: var(--accent-red);">(17 min late)</span> &rarr; <strong>Duty In: 09:00</strong>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide">
+        <div class="slide-header">
+            <h2 class="slide-title">Duty-Out Reconciliation Logic</h2>
+            <span class="material-symbols-outlined" style="font-size: 2.5rem; color: var(--ts-blue);">logout</span>
+        </div>
+        <div class="slide-content">
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 20%;">Scenario</th>
+                        <th style="width: 45%;">Condition</th>
+                        <th style="width: 35%;">Assigned Duty-Out</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="bg-light-red">
+                        <td><strong>Penalty</strong></td>
+                        <td>Left before shift end time</td>
+                        <td>Rounded <strong>DOWN</strong> to previous 30-minute mark</td>
+                    </tr>
+                    <tr>
+                        <td><strong>OT Out</strong></td>
+                        <td>Stayed past shift end AND <span class="mono">outOtAllowed = true</span></td>
+                        <td>Rounded <strong>DOWN</strong> to previous 30-minute mark</td>
+                    </tr>
+                    <tr class="bg-light-green">
+                        <td><strong>Normal</strong></td>
+                        <td>Left at or after shift end, no OT permissions</td>
+                        <td>Capped at <strong>Exact</strong> Shift End Time</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div style="margin-top: 3rem; background: var(--slate-50); padding: 1.5rem; border-radius: 8px; display: inline-block; border-left: 4px solid var(--ts-blue);">
+                <strong>Example Calculation:</strong> Shift ends 17:30 | Left 17:15 <span style="color: var(--accent-red);">(Early departure)</span> &rarr; <strong>Duty Out: 17:00</strong>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide">
+        <div class="slide-header">
+            <h2 class="slide-title">Overtime & Net Calculation</h2>
+            <span class="material-symbols-outlined" style="font-size: 2.5rem; color: var(--ts-blue);">calculate</span>
+        </div>
+        <div class="slide-content">
+            <div class="grid-2">
+                <div>
+                    <div class="math-box">
+                        $$ \text{Total OT} = \lfloor \text{In-OT} + \text{Out-OT} \rfloor_{0.5h} $$
+                    </div>
+                    <p style="color: #64748b; margin-left: 1rem; margin-bottom: 2rem;">* All OT is floored to strict 0.5-hour increments to ensure compliance with billing standards.</p>
+                    
+                    <div class="math-box" style="border-left-color: var(--accent-green);">
+                        $$ \text{Total Working Hours} = \text{Duty Hours} + \text{Total OT} $$
+                    </div>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+                    <div class="card">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem;"><span class="material-symbols-outlined">timer</span> Maximum Duty</h3>
+                        <p>Capped at 8 hours (9 with lunch parameter). Hardcoded to enforce regulatory compliance seamlessly.</p>
+                    </div>
+                    <div class="card">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem; color: var(--accent-red);"><span class="material-symbols-outlined">exposure_neg_1</span> Strict Thresholds</h3>
+                        <p>Any calculated work span < 30 mins automatically zeroes out overtime payment.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide">
+        <div class="slide-header">
+            <h2 class="slide-title">System Architecture</h2>
+            <span class="material-symbols-outlined" style="font-size: 2.5rem; color: var(--ts-blue);">account_tree</span>
+        </div>
+        <div class="slide-content">
+            <p style="font-size: 1.25rem; font-weight: 600; margin-bottom: 2rem;">The tool follows a strict Separation of Concerns pattern, distributed across modular nodes:</p>
+            
+            <div class="grid-2">
+                <div class="arch-layer">
+                    <h3><span class="material-symbols-outlined">database</span> persistent_data.js</h3>
+                    <p>Ground truth database storing employee profiles and master rules. Serves as the static data layer.</p>
+                </div>
+                <div class="arch-layer">
+                    <h3><span class="material-symbols-outlined">upload_file</span> masterFileUpload.js</h3>
+                    <p>Dynamic runtime data ingestion interface for punch logs and presentee reports. Replaces static data when necessary.</p>
+                </div>
+                <div class="arch-layer">
+                    <h3><span class="material-symbols-outlined">memory</span> hoursProcessing.js</h3>
+                    <p>The core business logic engine. Pure functions executing proximity algorithms, shift assignments, and math computations.</p>
+                </div>
+                <div class="arch-layer">
+                    <h3><span class="material-symbols-outlined">table_chart</span> renderTable.js</h3>
+                    <p>Multi-sheet XLSX export handler and DOM mutator for generating interactive billing reports.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide">
+        <div class="slide-header">
+            <h2 class="slide-title">Technology & Performance</h2>
+            <span class="material-symbols-outlined" style="font-size: 2.5rem; color: var(--ts-blue);">terminal</span>
+        </div>
+        <div class="slide-content">
+            <div style="text-align: center; margin-bottom: 3rem;">
+                <p style="font-size: 1.5rem; font-weight: 600; color: var(--slate-900);">Lightweight & Dependency-Free Environment</p>
+                <p>The application executes entirely client-side. Zero server requirements, zero installation overhead.</p>
+            </div>
+
+            <div class="grid-4" style="text-align: center;">
+                <div>
+                    <span class="material-symbols-outlined" style="font-size: 4rem; color: #e34f26; margin-bottom: 1rem;">code</span>
+                    <h3 style="font-size: 1.5rem; color: var(--slate-900);">HTML5/CSS3</h3>
+                    <p>Semantic Design</p>
+                </div>
+                <div>
+                    <span class="material-symbols-outlined" style="font-size: 4rem; color: #f7df1e; margin-bottom: 1rem;">javascript</span>
+                    <h3 style="font-size: 1.5rem; color: var(--slate-900);">Vanilla JS</h3>
+                    <p>Pure & Modular</p>
+                </div>
+                <div>
+                    <span class="material-symbols-outlined" style="font-size: 4rem; color: #107c41; margin-bottom: 1rem;">table_view</span>
+                    <h3 style="font-size: 1.5rem; color: var(--slate-900);">SheetJS</h3>
+                    <p>Excel Binary I/O</p>
+                </div>
+                <div>
+                    <span class="material-symbols-outlined" style="font-size: 4rem; color: var(--slate-800); margin-bottom: 1rem;">cloud_done</span>
+                    <h3 style="font-size: 1.5rem; color: var(--slate-900);">GitHub Pages</h3>
+                    <p>Zero Maintenance</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide">
+        <div class="slide-header">
+            <h2 class="slide-title">Impact Analysis</h2>
+            <span class="material-symbols-outlined" style="font-size: 2.5rem; color: var(--ts-blue);">trending_up</span>
+        </div>
+        <div class="slide-content">
+            <div class="impact-container">
+                <div class="impact-stat">
+                    <div class="impact-number bad">66 <span style="font-size: 3rem;">hrs</span></div>
+                    <div class="impact-label">Manual Legacy Method</div>
+                    <div class="impact-sub">Processing 2k employees at ~2 mins/emp. High error-variance in calculations and aggregation.</div>
+                </div>
+                
+                <div>
+                    <span class="material-symbols-outlined" style="font-size: 4rem; color: #cbd5e1;">arrow_right_alt</span>
+                </div>
+
+                <div class="impact-stat">
+                    <div class="impact-number good">5 <span style="font-size: 3rem;">sec</span></div>
+                    <div class="impact-label">Automated System</div>
+                    <div class="impact-sub">100% calculation accuracy, automated precision rounding, and immediate one-click XLSX export.</div>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 2rem;">
+                <div style="display: inline-block; background: var(--ts-blue); color: #fff; font-size: 1.5rem; font-weight: 800; padding: 1rem 3rem; border-radius: 50px; text-transform: uppercase;">
+                    > 99% Reduction in Processing Time
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide">
+        <div class="slide-header">
+            <h2 class="slide-title">Dynamic Scalability: Master Files</h2>
+            <span class="material-symbols-outlined" style="font-size: 2.5rem; color: var(--ts-blue);">dynamic_feed</span>
+        </div>
+        <div class="slide-content">
+            <p style="font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem;">Runtime Database Injection</p>
+            <p style="margin-bottom: 3rem;">Engineered for adaptability. Users can inject custom employee details via the Master File Excel Sheet, overriding local data to seamlessly deploy across different vendor groups.</p>
+            
+            <div class="grid-2">
+                <div class="card" style="display: flex; gap: 1.5rem; align-items: flex-start;">
+                    <span class="material-symbols-outlined" style="font-size: 3rem; color: var(--ts-blue);">badge</span>
+                    <div>
+                        <h3 style="font-size: 1.5rem; font-weight: 800; color: var(--ts-blue);">Sheet 1: Employee Details</h3>
+                        <p>Ingests SP numbers, Names, Designations, Skills, and specific OT Permissions parameters.</p>
+                    </div>
+                </div>
+                <div class="card" style="display: flex; gap: 1.5rem; align-items: flex-start;">
+                    <span class="material-symbols-outlined" style="font-size: 3rem; color: var(--ts-blue);">schedule</span>
+                    <div>
+                        <h3 style="font-size: 1.5rem; font-weight: 800; color: var(--ts-blue);">Sheet 2: Shift Definitions</h3>
+                        <p>Configurable In/Out times establishing the bounds for the proximity algorithm.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="slide" style="justify-content: center; align-items: center; text-align: center; background: var(--ts-blue); color: #fff;">
+        <span class="material-symbols-outlined" style="font-size: 6rem; color: #fff; margin-bottom: 2rem;">play_circle</span>
+        <h1 style="color: #fff; font-size: 6rem; letter-spacing: 0.1em;">DEMO</h1>
+        <p style="color: #cbd5e1; font-size: 1.5rem; margin-top: 1rem;">Live System Execution & Verification</p>
+    </section>
+
+</div>
+
+</body>
+</html>
