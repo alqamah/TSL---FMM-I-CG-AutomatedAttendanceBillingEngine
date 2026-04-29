@@ -182,6 +182,7 @@ button:disabled {
 }
 
 .section-heading {
+    grid-column: 1 / -1;
     width: 100%;
     max-width: 900px;
     margin: 0 auto 0.25rem;
@@ -235,17 +236,16 @@ button:disabled {
 }
 
 .upload-section {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 1rem;
-    justify-content: center;
     align-items: stretch;
     margin-bottom: 1.5rem;
 }
 
 .upload-card {
-    width: min(100%, 34rem);
-    min-height: 320px;
+    width: 100%;
+    min-height: 300px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -297,6 +297,7 @@ button:disabled {
 }
 
 .master-upload-wrapper {
+    grid-column: 1 / -1;
     width: 100%;
     display: flex;
     flex-wrap: wrap;
@@ -794,8 +795,12 @@ tbody td:nth-child(20) {
         width: 100%;
     }
 
+    .upload-section {
+        grid-template-columns: 1fr;
+    }
+
     .upload-card {
-        min-height: 280px;
+        min-height: 220px;
     }
 
     .master-file-badge,
