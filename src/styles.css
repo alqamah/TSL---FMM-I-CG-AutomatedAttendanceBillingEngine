@@ -160,10 +160,12 @@ button:disabled {
 
 .header-content h1 {
     font-family: var(--font-heading);
-    font-size: clamp(1.25rem, 2vw, 1.75rem);
-    font-weight: 700;
-    color: var(--text-primary);
-    letter-spacing: 0;
+    /* font-size: clamp(1.25rem, 2vw, 1.75rem); */
+    font-weight: 300;
+    margin-left: 10rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.05rem;
+    font-size: 30px;
 }
 
 .header-content p,
@@ -824,6 +826,7 @@ tbody td:nth-child(20) {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {
