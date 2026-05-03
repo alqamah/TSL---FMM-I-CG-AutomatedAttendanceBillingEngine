@@ -19,25 +19,13 @@
     <a class="skip-link" href="#mainContent">Skip to main content</a>
     <div class="app-container">
         <header class="header">
-            <div class="header-content">
-                <div class="logo-group">
-                    <img src="../assets/logo2.svg" alt="Tata Steel logo" class="app-logo">
-                    <h1>CLM Attendance Reconcilation Tool</h1>
-                </div>
-                <p>FMM-INFRA, Crane Group</p>
+            <div class="logo-group">
+                <img src="../assets/logo2.svg" alt="Tata Steel logo" class="app-logo">
+                <p class="header-subtitle">FMM-INFRA, Crane Group</p>
             </div>
+            <h1 class="header-title">CLM Attendance Reconcilation Tool</h1>
             <div class="header-actions">
-                <button id="exportBtn" class="btn btn-primary" disabled
-                    aria-label="Export calculated working hours to XLSX">
-                    <svg aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="2"
-                        viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="16" width="16"
-                        xmlns="http://www.w3.org/2000/svg">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    <span>Export XLSX</span>
-                </button>
+
             </div>
         </header>
 
@@ -52,7 +40,8 @@
                         <img src="../assets/1.png" alt="" class="app-logo clm-logo" aria-hidden="true">
                     </div>
                     <!-- <span class="upload-title">Presentee Report</span> -->
-                    <span class="upload-helper">Select one or more <b>Presentee Report</b> Excel Sheets downloaded from CLM.</span>
+                    <span class="upload-helper">Select one or more <b>Presentee Report</b> Excel Sheets downloaded from
+                        CLM.</span>
                     <input type="file" id="fileInput" class="sr-only" accept=".xls,.xlsx" multiple>
                 </label>
 
@@ -61,7 +50,8 @@
                         <img src="../assets/2.png" alt="" class="app-logo clm-logo" aria-hidden="true">
                     </div>
                     <!-- <span class="upload-title">Punch Records</span> -->
-                    <span class="upload-helper">Select one or more <b>Punch-in / Punch-out</b> Excel Sheets downloaded from CLM.</span>
+                    <span class="upload-helper">Select one or more <b>Punch-in / Punch-out</b> Excel Sheets downloaded
+                        from CLM.</span>
                     <input type="file" id="pipoInput" class="sr-only" accept=".xls,.xlsx" multiple>
                 </label>
 
@@ -76,15 +66,31 @@
                             <line x1="12" y1="3" x2="12" y2="15"></line>
                         </svg>
                         Upload Master File
-                    </button>
-                    <span id="masterFileStatus" class="master-file-badge master-file-badge--idle" role="status"
-                        aria-live="polite">No file loaded</span>
 
+
+                    </button>
+                    
                     <label class="bypass-checkbox-label"
                         title="When checked, skill/designation/shift/OT data from persistent_data.js will not be applied">
                         <input type="checkbox" id="bypassPersistentDataCheckbox">
                         <span>Bypass Persistent Data</span>
                     </label>
+
+                    <span id="masterFileStatus" class="master-file-badge master-file-badge--idle" role="status"
+                        aria-live="polite">No file loaded</span>
+
+                        <button id="exportBtn" class="btn btn-primary" disabled
+                    aria-label="Export calculated working hours to XLSX">
+                    <svg aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="2"
+                        viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="16" width="16"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    <span>Export XLSX</span>
+                </button>
+
                 </div>
             </section>
 
