@@ -276,6 +276,33 @@ button:disabled {
     box-shadow: var(--shadow-md);
 }
 
+/* ─── CLM Upload Warning ─── */
+.clm-upload-warning {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.85rem 1.15rem;
+    margin-bottom: 1rem;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-text);
+    border-radius: var(--radius-md);
+    color: var(--warning-text);
+    font-size: 0.92rem;
+    font-weight: 500;
+    line-height: 1.45;
+}
+
+.clm-upload-warning svg {
+    flex-shrink: 0;
+}
+
+/* ─── Disabled Upload Cards ─── */
+.upload-cards-row.is-disabled {
+    pointer-events: none;
+    opacity: 0.4;
+    filter: grayscale(0.6);
+}
+
 .upload-icon {
     display: flex;
     justify-content: center;

@@ -76,7 +76,16 @@
                 <div class="step-heading">
                     <h2 id="clmHeading"><b>Step 2:</b> Upload the CLM Reports downloaded from the portal</h2>
                 </div>
-                <div class="upload-cards-row">
+                <div id="clmUploadWarning" class="clm-upload-warning">
+                    <svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    <span>Please upload a <b>Master File</b> in Step 1, or check <b>Bypass Master-Sheet</b> to continue without one.</span>
+                </div>
+                <div class="upload-cards-row" id="clmUploadCardsRow">
                     <label class="upload-card" for="fileInput" id="upload-presentee">
                         <div class="upload-icon">
                             <img src="../assets/1.png" alt="" class="app-logo clm-logo" aria-hidden="true">
