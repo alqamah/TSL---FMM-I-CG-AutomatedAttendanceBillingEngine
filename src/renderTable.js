@@ -141,7 +141,7 @@ function renderTable() {
                 <td title="sp-no">${row.sp_no || ''}</td>
                 <td title="name">${row.name || ''}</td>
                 <td title="punch-in">${row.punchIn || ''}</td>
-                <td title="punch-out">${row.punchOut || ''}</td>
+                <td title="${row.punchOutNextDate ? 'Punch-out on: ' + row.punchOutNextDate : 'punch-out'}" class="${row.punchOutNextDate ? 'next-day-out' : ''}">${row.punchOut || ''}${row.punchOutNextDate ? '<sup class="next-day-badge">+1</sup>' : ''}</td>
                 <td title="total-hrs" class="highlight-hours">${row.totalHours ?? ''}</td>
                 <td title="duty-hrs">${row.dutyHours ?? ''}</td>
                 <td title="ot-hrs">${row.otHours ?? ''}</td>

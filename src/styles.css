@@ -173,7 +173,6 @@ button:disabled {
 .header .header-title {
     font-size: 28px;
     color: var(--text-secondary);
-    opacity: 0.5;
     font-weight: 900;
     word-spacing: 0.2rem;
     font-variant: small-caps;
@@ -182,7 +181,7 @@ button:disabled {
 }
 
 .header .header-title:hover {
-    opacity: 1;
+    color: var(--text-primary);
     cursor: pointer;
 }
 
@@ -787,6 +786,25 @@ tbody td:nth-child(20) {
     color: var(--flag-text);
     border: 2px solid var(--flag-border);
     font-weight: 700;
+}
+
+/* C-shift next-day punch-out indicator */
+.next-day-out {
+    position: relative;
+}
+
+.next-day-badge {
+    display: inline-block;
+    margin-left: 2px;
+    padding: 0 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #1d4ed8;
+    background: #dbeafe;
+    border-radius: 3px;
+    vertical-align: super;
+    cursor: help;
 }
 
 .empty-state {

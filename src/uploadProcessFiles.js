@@ -104,16 +104,19 @@ function _resolveCShiftCrossDate() {
             const nextEntry  = entries[pos + 1]; // next calendar-date entry for this employee
 
             let newPunchOut = '';
+            let punchOutDate = ''; // date the punch-out actually falls on
             if (nextEntry) {
                 const nextOutMins = parseTimeFormatToMinutes(nextEntry.row.punchOut);
                 // Only take if the next entry's Out is a morning time (< 12:00)
                 if (nextOutMins !== null && nextOutMins < 12 * 60) {
                     newPunchOut = nextEntry.row.punchOut;
+                    punchOutDate = nextEntry.row.date; // the next calendar date
                 }
             }
 
-            // Update punchOut
+            // Update punchOut and tag with next-day date for rendering
             currentRow.punchOut = newPunchOut;
+            currentRow.punchOutNextDate = punchOutDate || null;
 
             // Recalculate shift, hours, duty for this row
             const inTime  = currentRow.punchIn;
@@ -521,6 +524,7 @@ async function processPipoFile(file) {
                     pipoEmployeeDetails.push({
                         date: group.date, sp_no: group.sp_no,
                         punchInMins, punchOutMins,
+                        punchOutNextDate: (punchOutMins !== null && nextGroup) ? nextGroup.date : null,
                         vendorName: group.vendor_name, workorderNo: group.workorder_no,
                         workmanName: group.workman_name, deptName: group.dept_name
                     });
@@ -627,6 +631,7 @@ async function processPipoFile(file) {
                 shiftOut,
                 punchIn:       inTime,
                 punchOut:      outTime,
+                punchOutNextDate: emp.punchOutNextDate || null,
                 dutyIn:        formattedDutyIn,
                 dutyOut:       formattedDutyOut,
                 addLunch,
