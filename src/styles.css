@@ -161,6 +161,15 @@ button:disabled {
     height: 32px;
 }
 
+.step-number {
+    background-color: var(--bg-muted);
+    padding: 5px;
+    border-radius: 5px;
+    margin-right: 5px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
 .header .header-title {
     font-size: 28px;
     color: var(--text-secondary);
@@ -191,7 +200,7 @@ button:disabled {
 .step-block {
     margin-bottom: 1.5rem;
     background-color: white;
-    border-radius: 25px;
+    border-radius: 10px;
     margin: 1rem;
     padding: 1rem;
 }
@@ -325,9 +334,12 @@ button:disabled {
 
 /* ─── Disabled Upload Cards ─── */
 .upload-cards-row.is-disabled {
-    pointer-events: none;
     opacity: 0.4;
     filter: grayscale(0.6);
+}
+
+.upload-cards-row.is-disabled .upload-card {
+    cursor: not-allowed;
 }
 
 .upload-icon {
@@ -720,6 +732,7 @@ tbody td {
     background: var(--bg-surface);
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
 }
 
 tbody tr:nth-child(even) td {

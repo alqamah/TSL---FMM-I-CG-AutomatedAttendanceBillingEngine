@@ -54,7 +54,7 @@ let employee_details = [
     { sp_no: "RW0911183405", name: "NARAYAN RAO", designation: "attender", skill: "semi skilled", allowedShifts: ['A', 'B', 'C'], inOtAllowed: false, outOtAllowed: true }
 ];
 
-let SHIFT_DEFINITIONS = {
+let DEFAULT_SHIFT_DEFINITIONS = {
     'A': { shiftIn: '06:00', shiftOut: '14:00' },
     'B': { shiftIn: '14:00', shiftOut: '22:00' },
     'C': { shiftIn: '22:00', shiftOut: '06:00' },

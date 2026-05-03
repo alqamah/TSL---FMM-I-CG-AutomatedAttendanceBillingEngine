@@ -40,11 +40,23 @@ let masterFileUploaded = false;
 let masterEmployeeDetails = [];
 
 /**
- * Shift definitions map, populated from the master sheet's Sheet 2.
- * Shape: { shiftKey: { shiftIn: 'HH:MM', shiftOut: 'HH:MM' }, … }
- * Starts empty — assignShift() will return 'NA' until a master file is loaded.
+ * Default shift definitions — used when no master sheet is uploaded
+ * or the master sheet does not contain a shift_definitions sheet.
  */
-let SHIFT_DEFINITIONS = {};
+const DEFAULT_SHIFT_DEFINITIONS = {
+    'A':  { shiftIn: '06:00', shiftOut: '14:00' },
+    'B':  { shiftIn: '14:00', shiftOut: '22:00' },
+    'C':  { shiftIn: '22:00', shiftOut: '06:00' },
+    'W1': { shiftIn: '08:30', shiftOut: '17:30' },
+    'G':  { shiftIn: '08:00', shiftOut: '17:00' }
+};
+
+/**
+ * Active shift definitions map.
+ * Starts with defaults; overwritten from the master sheet's Sheet 2 if available.
+ * Shape: { shiftKey: { shiftIn: 'HH:MM', shiftOut: 'HH:MM' }, … }
+ */
+let SHIFT_DEFINITIONS = { ...DEFAULT_SHIFT_DEFINITIONS };
 
 /**
  * Master employee-data array.
@@ -293,8 +305,8 @@ function updateCLMUploadState() {
     const bypassed   = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
     const canUpload  = masterFileUploaded || bypassed;
 
-    if (warningEl) {
-        warningEl.classList.toggle('is-hidden', canUpload);
+    if (warningEl && canUpload) {
+        warningEl.classList.add('is-hidden');
     }
     if (cardsRow) {
         cardsRow.classList.toggle('is-disabled', !canUpload);
@@ -339,6 +351,21 @@ window.addEventListener('load', () => {
     // Bypass checkbox toggles CLM upload availability
     if (bypassMasterFileCheckbox) {
         bypassMasterFileCheckbox.addEventListener('change', updateCLMUploadState);
+    }
+
+    // Attempting to click Step 2 area shows warning if Step 1 is not done
+    const cardsRow = document.getElementById('clmUploadCardsRow');
+    if (cardsRow) {
+        cardsRow.addEventListener('click', () => {
+            const bypassed = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
+            const canUpload = masterFileUploaded || bypassed;
+            if (!canUpload) {
+                const warningEl = document.getElementById('clmUploadWarning');
+                if (warningEl) {
+                    warningEl.classList.remove('is-hidden');
+                }
+            }
+        });
     }
 
     // Set initial state: CLM uploads blocked until master file or bypass

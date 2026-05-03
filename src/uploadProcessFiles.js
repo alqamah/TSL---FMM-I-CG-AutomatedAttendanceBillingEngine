@@ -347,21 +347,26 @@ async function processPipoFile(file) {
             const deptName    = record.dept_name    || '';
             const spNo        = Object.keys(record).find(k => k !== 'date' && k !== 'vendor_name' && k !== 'workorder_no' && k !== 'workman_name' && k !== 'dept_name');
 
-            let punchIn  = null;
-            let punchOut = null;
+            let punchInMins  = null;
+            let punchOutMins = null;
 
             if (spNo && record[spNo]) {
                 const inTimes  = record[spNo]['IN']  || [];
                 const outTimes = record[spNo]['OUT'] || [];
 
-                const validIn  = inTimes.filter(t  => t !== '').map(Number).filter(n => !isNaN(n));
-                const validOut = outTimes.filter(t => t !== '').map(Number).filter(n => !isNaN(n));
+                const toMins = val => {
+                    if (typeof val === 'number') return Math.round((val % 1) * 1440);
+                    return parseTimeFormatToMinutes(val);
+                };
 
-                if (validIn.length  > 0) punchIn  = Math.min(...validIn);
-                if (validOut.length > 0) punchOut = Math.max(...validOut);
+                const validInMins  = inTimes.filter(t => t !== '').map(toMins).filter(m => m !== null);
+                const validOutMins = outTimes.filter(t => t !== '').map(toMins).filter(m => m !== null);
+
+                if (validInMins.length  > 0) punchInMins  = Math.min(...validInMins);
+                if (validOutMins.length > 0) punchOutMins = Math.max(...validOutMins);
             }
 
-            return { date, sp_no: spNo, punchIn, punchOut, vendorName, workorderNo, workmanName, deptName };
+            return { date, sp_no: spNo, punchInMins, punchOutMins, vendorName, workorderNo, workmanName, deptName };
         });
 
         console.log('pipoEmployeeDetails:', pipoEmployeeDetails);
@@ -371,9 +376,9 @@ async function processPipoFile(file) {
         const processedRows = [];
 
         pipoEmployeeDetails.forEach(emp => {
-            // Excel fractional-day → minutes → HH:MM string
-            const inTime  = emp.punchIn  !== null ? formatMinutesTo24h(Math.round(emp.punchIn  * 1440)) : '';
-            const outTime = emp.punchOut !== null ? formatMinutesTo24h(Math.round(emp.punchOut * 1440)) : '';
+            // Minutes since midnight → HH:MM string
+            const inTime  = emp.punchInMins  !== null ? formatMinutesTo24h(emp.punchInMins)  : '';
+            const outTime = emp.punchOutMins !== null ? formatMinutesTo24h(emp.punchOutMins) : '';
 
             const normalizedDate = emp.date ? normalizeDate(emp.date) : '';
 

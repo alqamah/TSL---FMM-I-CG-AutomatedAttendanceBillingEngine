@@ -33,7 +33,7 @@
             <!-- ── Step 1 ── -->
             <section class="step-block" aria-labelledby="uploadHeading">
                 <div class="step-heading">
-                    <h2 id="uploadHeading"><b>Step 1:</b> Upload the Master Sheet containing the details of the Employees</h2>
+                    <h2 id="uploadHeading"><b class="step-number">Step 1:</b> Upload the Master Sheet containing the details of the Employees</h2>
                     <label class="bypass-master-label"
                         title="When checked, the tool will skip the Master File and use only the CLM data">
                         <input type="checkbox" id="bypassMasterFileCheckbox">
@@ -74,9 +74,9 @@
             <!-- ── Step 2 ── -->
             <section class="step-block" aria-labelledby="clmHeading">
                 <div class="step-heading">
-                    <h2 id="clmHeading"><b>Step 2:</b> Upload the CLM Reports downloaded from the portal</h2>
+                    <h2 id="clmHeading"><b class="step-number">Step 2:</b> Upload the CLM Reports downloaded from the portal</h2>
                 </div>
-                <div id="clmUploadWarning" class="clm-upload-warning">
+                <div id="clmUploadWarning" class="clm-upload-warning is-hidden">
                     <svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
@@ -171,8 +171,7 @@
                     </div>
 
                     <table id="dataTable" aria-describedby="tableHelp">
-                        <caption id="tableHelp">Calculated working hours. Sortable headers are buttons and flagged
-                            shifts include text labels.</caption>
+                        <caption id="tableHelp">Calculated working hours</caption>
                         <thead>
                             <tr>
                                 <th>SN</th>

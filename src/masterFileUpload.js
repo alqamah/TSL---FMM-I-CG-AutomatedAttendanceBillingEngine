@@ -188,16 +188,19 @@ async function handleMasterFileUpload(event) {
         const parsedEmployees = _parseEmployeeDetailsSheet(workbook.Sheets[empSheetName]);
         console.groupEnd();
 
-        // ---- Sheet 2: shift_definitions ----
+        // ---- Sheet 2: shift_definitions (optional) ----
         const shiftSheetName = workbook.SheetNames.find(n =>
             n.toLowerCase().replace(/\s/g, '') === 'shiftdefinitions'
         ) || workbook.SheetNames[1];
 
-        if (!shiftSheetName) throw new Error('Could not locate "shift_definitions" sheet (Sheet 2).');
-
-        console.group(`Sheet 2 → "${shiftSheetName}" (shift_definitions)`);
-        const parsedShifts = _parseShiftDefinitionsSheet(workbook.Sheets[shiftSheetName]);
-        console.groupEnd();
+        let parsedShifts = {};
+        if (shiftSheetName && workbook.Sheets[shiftSheetName]) {
+            console.group(`Sheet 2 → "${shiftSheetName}" (shift_definitions)`);
+            parsedShifts = _parseShiftDefinitionsSheet(workbook.Sheets[shiftSheetName]);
+            console.groupEnd();
+        } else {
+            console.warn('[Master] No shift_definitions sheet found — using defaults.');
+        }
 
         console.groupEnd(); // Master File Upload
 
@@ -206,8 +209,13 @@ async function handleMasterFileUpload(event) {
         masterEmployeeDetails = parsedEmployees;
 
         // Clear and repopulate SHIFT_DEFINITIONS in-place
+        // If the master sheet had shift definitions, use them; otherwise reset to defaults
         Object.keys(SHIFT_DEFINITIONS).forEach(k => delete SHIFT_DEFINITIONS[k]);
-        Object.assign(SHIFT_DEFINITIONS, parsedShifts);
+        if (Object.keys(parsedShifts).length > 0) {
+            Object.assign(SHIFT_DEFINITIONS, parsedShifts);
+        } else {
+            Object.assign(SHIFT_DEFINITIONS, DEFAULT_SHIFT_DEFINITIONS);
+        }
 
         console.log('[Master] Updated masterEmployeeDetails:', masterEmployeeDetails);
         console.log('[Master] Updated SHIFT_DEFINITIONS:', SHIFT_DEFINITIONS);

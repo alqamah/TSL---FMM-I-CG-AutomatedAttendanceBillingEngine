@@ -12,12 +12,14 @@
  */
 function parseTimeFormatToMinutes(timeStr) {
     try {
-        const timeMatch = String(timeStr).trim().match(/^(\d{1,2})[.:]?(\d{2})?\s*([aApP][mM])?$/);
+        // Regex to match HH:MM, HH:MM:SS, HH.MM, H AM/PM, etc.
+        const timeMatch = String(timeStr).trim().match(/^(\d{1,2})[:.]?(\d{2})?[:.]?(\d{2})?\s*([aApP][mM])?$/);
         if (!timeMatch) return null;
 
         let hours = parseInt(timeMatch[1], 10);
         const mins = parseInt(timeMatch[2] || '0', 10);
-        const period = timeMatch[3] ? timeMatch[3].toUpperCase() : null;
+        // We ignore seconds (timeMatch[3]) as the tool calculates based on minutes.
+        const period = timeMatch[4] ? timeMatch[4].toUpperCase() : null;
 
         if (period === 'PM' && hours < 12) hours += 12;
         if (period === 'AM' && hours === 12) hours = 0;
