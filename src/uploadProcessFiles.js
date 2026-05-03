@@ -93,7 +93,7 @@ async function processPresenteeFile(file) {
     statusItem.className = 'status-item';
     statusItem.innerHTML = `
         <span class="file-name">${file.name}</span>
-        <span class="status-text">Processing...</span>
+        <span class="status-text"></span>
     `;
     fileStatusList.appendChild(statusItem);
 
@@ -232,7 +232,7 @@ async function processPresenteeFile(file) {
         employeeData = employeeData.concat(processedRows);
 
         statusItem.classList.add('success');
-        statusItem.querySelector('.status-text').textContent = 'Success';
+        statusItem.querySelector('.status-text').textContent = '';
 
     } catch (err) {
         console.error('processPresenteeFile error:', err);
@@ -257,7 +257,7 @@ async function processPipoFile(file) {
     statusItem.className = 'status-item';
     statusItem.innerHTML = `
         <span class="file-name">${file.name}</span>
-        <span class="status-text">Processing...</span>
+        <span class="status-text"></span>
     `;
     fileStatusList.appendChild(statusItem);
 
@@ -443,7 +443,7 @@ async function processPipoFile(file) {
         employeeData = employeeData.concat(processedRows);
 
         statusItem.classList.add('success');
-        statusItem.querySelector('.status-text').textContent = 'Success';
+        statusItem.querySelector('.status-text').textContent = '';
 
     } catch (err) {
         console.error('processPipoFile error:', err);

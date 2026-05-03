@@ -279,6 +279,32 @@ function reprocessData() {
 }
 
 // -----------------------------------------------
+// CLM UPLOAD GATING
+// -----------------------------------------------
+
+/**
+ * Enables or disables the CLM file upload section (Step 2) based on
+ * whether a master file has been uploaded or the bypass checkbox is checked.
+ * Shows a warning banner when uploads are blocked.
+ */
+function updateCLMUploadState() {
+    const warningEl  = document.getElementById('clmUploadWarning');
+    const cardsRow   = document.getElementById('clmUploadCardsRow');
+    const bypassed   = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
+    const canUpload  = masterFileUploaded || bypassed;
+
+    if (warningEl) {
+        warningEl.classList.toggle('is-hidden', canUpload);
+    }
+    if (cardsRow) {
+        cardsRow.classList.toggle('is-disabled', !canUpload);
+    }
+    // Also disable file inputs to prevent programmatic triggering
+    if (fileInput) fileInput.disabled = !canUpload;
+    if (pipoInput) pipoInput.disabled = !canUpload;
+}
+
+// -----------------------------------------------
 // EVENT LISTENERS
 // -----------------------------------------------
 // Deferred: main.js loads first, so functions from other scripts are not yet defined.
@@ -299,8 +325,22 @@ window.addEventListener('load', () => {
     if (masterFileBtn && masterFileInput) {
         masterFileBtn.addEventListener('click', () => masterFileInput.click());
     }
-    if (masterFileInput)    masterFileInput.addEventListener('change', handleMasterFileUpload);
+    if (masterFileInput) {
+        masterFileInput.addEventListener('change', async (event) => {
+            await handleMasterFileUpload(event);
+            // After master file is processed, unlock CLM uploads
+            updateCLMUploadState();
+        });
+    }
     if (btnEmployeeTotal)   btnEmployeeTotal.addEventListener('click', employeewiseTotalHours);
     if (btnSkillTotal)      btnSkillTotal.addEventListener('click', skillwiseTotalHours);
     if (btnExitAggregate)   btnExitAggregate.addEventListener('click', reprocessData);
+
+    // Bypass checkbox toggles CLM upload availability
+    if (bypassMasterFileCheckbox) {
+        bypassMasterFileCheckbox.addEventListener('change', updateCLMUploadState);
+    }
+
+    // Set initial state: CLM uploads blocked until master file or bypass
+    updateCLMUploadState();
 });
