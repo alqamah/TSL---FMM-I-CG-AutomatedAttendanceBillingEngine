@@ -296,7 +296,8 @@ button:disabled {
     max-width: fit-content;
     font-size: 0.95rem;
     padding: 0 1rem;
-    background-color: wheat;
+    border-radius: 50px;
+    background-color: var(--border-strong);
 }
 
 .master-upload-wrapper {
