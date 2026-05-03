@@ -1,3 +1,6 @@
+# LIVE LINK
+https://alqamah.github.io/TSL---FMM-I-CG-AutomatedAttendanceBillingEngine/src/index.html
+
 # Working Hours Calculator
 
 This application calculates the exact total working hours, duty hours, and overtime (OT) for employees based on uploaded CLM (Contract Labor Management) punch-in and punch-out data. Designed to seamlessly handle complex payroll edge cases, this tool automatically assigns accurate shifts, enforces custom overtime logic, and generates reliable reporting aggregates.
@@ -29,7 +32,11 @@ This application calculates the exact total working hours, duty hours, and overt
 | **Normal Leave** | Left at or past shift end but no OT allowed | Exact Shift Out time | Shift ends 17:30. Left 18:15 ➔ Duty Out 17:30 |
 
 ### Overtime (OT) Policy
-- All computed Overtime (OT) is automatically floored and allotted  in **30-minute chunks** (0.5 hour integers). 
+- All computed Overtime (OT) is automatically floored and allotted  in **1-hour-chunks** (1 hour integers). 
+- If the employee is allowed OT (permissions are present in persistent_data), then the OT will be calculated as follows:
+    - if *inOT is allowed* and *applicable*, **inOT = shiftIn - dutyIn**
+    - if *outOT is allowed* and *applicable*, **outOT = dutyOut - shiftOut**
+    - **totalOT = inOT + outOT**
 
 ### Shift Definitions
 
@@ -40,3 +47,8 @@ This application calculates the exact total working hours, duty hours, and overt
 | **C** | 22:00 | 06:00 |
 | **W1** | 08:30 | 17:30 |
 | **G** | 08:00 | 17:00 |
+
+### Edge Cases
+
+- If **Shift is not defined** or employee is **not present in the persistent_data**, the best shift will be allocated from the shift-definition
+- Else, the best shift will be allocated from among the shifts allowed. 
