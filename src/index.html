@@ -30,67 +30,70 @@
         </header>
 
         <main class="main-content" id="mainContent">
-            <section class="upload-section" aria-labelledby="uploadHeading">
-                <div class="section-heading">
-                    <h2 id="uploadHeading">Upload CLM Files</h2>
+            <!-- ── Step 1 ── -->
+            <section class="step-block" aria-labelledby="uploadHeading">
+                <div class="step-heading">
+                    <h2 id="uploadHeading"><b>Step 1:</b> Upload the Master File containing the details of the Employees</h2>
+                    <label class="bypass-master-label"
+                        title="When checked, the tool will skip the Master File and use only the CLM data">
+                        <input type="checkbox" id="bypassMasterFileCheckbox">
+                        <span>Bypass Master-Sheet</span>
+                    </label>
                 </div>
-
-                <label class="upload-card" for="fileInput" id="upload-presentee">
-                    <div class="upload-icon">
-                        <img src="../assets/1.png" alt="" class="app-logo clm-logo" aria-hidden="true">
-                    </div>
-                    <!-- <span class="upload-title">Presentee Report</span> -->
-                    <span class="upload-helper">Select one or more <b>Presentee Report</b> Excel Sheets downloaded from
-                        CLM.</span>
-                    <input type="file" id="fileInput" class="sr-only" accept=".xls,.xlsx" multiple>
-                </label>
-
-                <label class="upload-card" for="pipoInput" id="upload-pipo">
-                    <div class="upload-icon">
-                        <img src="../assets/2.png" alt="" class="app-logo clm-logo" aria-hidden="true">
-                    </div>
-                    <!-- <span class="upload-title">Punch Records</span> -->
-                    <span class="upload-helper">Select one or more <b>Punch-in / Punch-out</b> Excel Sheets downloaded
-                        from CLM.</span>
-                    <input type="file" id="pipoInput" class="sr-only" accept=".xls,.xlsx" multiple>
-                </label>
-
-                <div class="master-upload-wrapper">
+                <div class="control-panel">
                     <input type="file" id="masterFileInput" accept=".xls,.xlsx" hidden>
-                    <button title="UPLOAD THE MASTER EXCEL SHEET CONTAINING ALL THE DETAILS OF THE VENDOR EMPLOYEES"
-                        id="masterFileBtn" class="btn-master-upload" type="button" aria-describedby="masterFileStatus">
-                        <svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="0 0 24 24" fill="none"
+
+                    <button title="Upload the Master Excel Sheet containing all the details of the vendor employees"
+                        id="masterFileBtn" class="ctrl-btn" type="button" aria-describedby="masterFileStatus">
+                        <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                             <polyline points="17 8 12 3 7 8"></polyline>
                             <line x1="12" y1="3" x2="12" y2="15"></line>
                         </svg>
                         Upload Master File
-
-
                     </button>
-                    
-                    <label class="bypass-checkbox-label"
-                        title="When checked, skill/designation/shift/OT data from persistent_data.js will not be applied">
-                        <input type="checkbox" id="bypassPersistentDataCheckbox">
-                        <span>Bypass Persistent Data</span>
-                    </label>
+
+                    <a id="downloadMasterSheetBtn" class="ctrl-btn" href="../assets/masterSheet_format.xlsx" download>
+                        <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                            <polyline points="10 9 9 9 8 9"></polyline>
+                        </svg>
+                        Download MasterSheet Format
+                    </a>
 
                     <span id="masterFileStatus" class="master-file-badge master-file-badge--idle" role="status"
                         aria-live="polite">No file loaded</span>
+                </div>
+            </section>
 
-                        <button id="exportBtn" class="btn btn-primary" disabled
-                    aria-label="Export calculated working hours to XLSX">
-                    <svg aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="2"
-                        viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="16" width="16"
-                        xmlns="http://www.w3.org/2000/svg">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    <span>Export XLSX</span>
-                </button>
+            <!-- ── Step 2 ── -->
+            <section class="step-block" aria-labelledby="clmHeading">
+                <div class="step-heading">
+                    <h2 id="clmHeading"><b>Step 2:</b> Upload the CLM Reports downloaded from the portal</h2>
+                </div>
+                <div class="upload-cards-row">
+                    <label class="upload-card" for="fileInput" id="upload-presentee">
+                        <div class="upload-icon">
+                            <img src="../assets/1.png" alt="" class="app-logo clm-logo" aria-hidden="true">
+                        </div>
+                        <span class="upload-helper">Select one or more <b>Presentee Report</b> Excel Sheets downloaded
+                            from CLM.</span>
+                        <input type="file" id="fileInput" class="sr-only" accept=".xls,.xlsx" multiple>
+                    </label>
 
+                    <label class="upload-card" for="pipoInput" id="upload-pipo">
+                        <div class="upload-icon">
+                            <img src="../assets/2.png" alt="" class="app-logo clm-logo" aria-hidden="true">
+                        </div>
+                        <span class="upload-helper">Select one or more <b>Punch-in / Punch-out</b> Excel Sheets
+                            downloaded from CLM.</span>
+                        <input type="file" id="pipoInput" class="sr-only" accept=".xls,.xlsx" multiple>
+                    </label>
                 </div>
             </section>
 
@@ -145,6 +148,17 @@
                             </button>
                             <div id="columnPickerDropdown" class="column-dropdown is-hidden"></div>
                         </div>
+
+                        <button id="exportBtn" class="stat-button" disabled
+                            aria-label="Export calculated working hours to XLSX">
+                            <svg aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="2.5"
+                                viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="16" width="16">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Export XLSX
+                        </button>
                     </div>
 
                     <table id="dataTable" aria-describedby="tableHelp">
@@ -214,12 +228,11 @@
         </footer>
     </div>
 
-    <script src="persistent_data.js"></script>
+    <script src="main.js"></script>
     <script src="hoursProcessing.js"></script>
     <script src="masterFileUpload.js"></script>
     <script src="uploadProcessFiles.js"></script>
     <script src="renderTable.js"></script>
-    <script src="main.js"></script>
 </body>
 
 </html>

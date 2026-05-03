@@ -1,7 +1,7 @@
 // masterFileUpload.js
-// Handles upload and parsing of the Master File (employee_details + SHIFT_DEFINITIONS).
-// On successful parse, overwrites the in-memory arrays/objects declared in persistent_data.js.
-// Dependencies: persistent_data.js (declares employee_details, SHIFT_DEFINITIONS as let/var),
+// Handles upload and parsing of the Master File (masterEmployeeDetails + SHIFT_DEFINITIONS).
+// On successful parse, populates the shared state declared in main.js.
+// Dependencies: main.js (masterFileUploaded, masterEmployeeDetails, SHIFT_DEFINITIONS),
 //               hoursProcessing.js (parseTimeFormatToMinutes, formatMinutesTo24h)
 
 // -----------------------------------------------
@@ -154,7 +154,7 @@ function _parseShiftDefinitionsSheet(worksheet) {
 /**
  * Handles the "Upload Master File" input change event.
  * Reads the selected XLSX, parses both sheets, logs the results, and replaces
- * the runtime employee_details and SHIFT_DEFINITIONS globals.
+ * the runtime masterEmployeeDetails and SHIFT_DEFINITIONS in main.js.
  */
 async function handleMasterFileUpload(event) {
     const file = event.target.files[0];
@@ -201,33 +201,15 @@ async function handleMasterFileUpload(event) {
 
         console.groupEnd(); // Master File Upload
 
-        // ---- Overwrite globals ----
-        // employee_details and SHIFT_DEFINITIONS are declared as `const` in persistent_data.js
-        // but we need to reassign them. Use the window object as a workaround while keeping
-        // backward-compatibility with all existing references.
-        //
-        // IMPORTANT: persistent_data.js must declare these with `let` (or use window.X = …)
-        // for this reassignment to work at runtime. If they are `const`, we splice in-place.
+        // ---- Update shared state (declared in main.js) ----
+        masterFileUploaded = true;
+        masterEmployeeDetails = parsedEmployees;
 
-        try {
-            // Try direct reassignment (works if declared with `let` / `var`)
-            employee_details.length = 0;
-            parsedEmployees.forEach(e => employee_details.push(e));
-        } catch (_) {
-            console.warn('[Master] Could not splice employee_details – trying window assignment.');
-            window.employee_details = parsedEmployees;
-        }
+        // Clear and repopulate SHIFT_DEFINITIONS in-place
+        Object.keys(SHIFT_DEFINITIONS).forEach(k => delete SHIFT_DEFINITIONS[k]);
+        Object.assign(SHIFT_DEFINITIONS, parsedShifts);
 
-        try {
-            // Clear and repopulate SHIFT_DEFINITIONS object in-place
-            Object.keys(SHIFT_DEFINITIONS).forEach(k => delete SHIFT_DEFINITIONS[k]);
-            Object.assign(SHIFT_DEFINITIONS, parsedShifts);
-        } catch (_) {
-            console.warn('[Master] Could not mutate SHIFT_DEFINITIONS – trying window assignment.');
-            window.SHIFT_DEFINITIONS = parsedShifts;
-        }
-
-        console.log('[Master] Updated employee_details:', employee_details);
+        console.log('[Master] Updated masterEmployeeDetails:', masterEmployeeDetails);
         console.log('[Master] Updated SHIFT_DEFINITIONS:', SHIFT_DEFINITIONS);
 
         setStatus(`Loaded: ${file.name}`, 'success');

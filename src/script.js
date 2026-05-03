@@ -10,7 +10,7 @@ const tableBody = document.getElementById('tableBody');
 const exportBtn = document.getElementById('exportBtn');
 const searchInput = document.getElementById('searchInput');
 const addLunchCheckbox = document.getElementById('addLunchCheckbox');
-const bypassPersistentDataCheckbox = document.getElementById('bypassPersistentDataCheckbox');
+const bypassMasterFileCheckbox = document.getElementById('bypassMasterFileCheckbox');
 const columnPickerBtn = document.getElementById('columnPickerBtn');
 const columnPickerDropdown = document.getElementById('columnPickerDropdown');
 
@@ -364,7 +364,7 @@ async function processPresenteeFile(file) {
                 let inOtAllowed = false;
                 let outOtAllowed = false;
 
-                const bypassPersistent = bypassPersistentDataCheckbox ? bypassPersistentDataCheckbox.checked : false;
+                const bypassPersistent = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
                 if (!bypassPersistent && typeof employee_details !== 'undefined') {
                     const empDetails = employee_details.find(e => e.sp_no === employeeId);
                     if (empDetails) {
@@ -583,7 +583,7 @@ async function processPipoFile(file) {
             let outOtAllowed    = false;
             let nameVal         = '';
 
-            const bypassPersistent = bypassPersistentDataCheckbox ? bypassPersistentDataCheckbox.checked : false;
+            const bypassPersistent = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
             if (!bypassPersistent && typeof employee_details !== 'undefined') {
                 const empDetails = employee_details.find(e => e.sp_no === emp.sp_no);
                 if (empDetails) {

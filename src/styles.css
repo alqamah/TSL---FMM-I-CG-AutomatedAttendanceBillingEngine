@@ -175,21 +175,39 @@ button:disabled {
     flex: 1;
 }
 
-.section-heading {
-    grid-column: 1 / -1;
-    text-align: center;
-    width: 100%;
-    /* background-color: white; */
+/* ─── Step Block ─── */
+.step-block {
+    margin-bottom: 1.5rem;
 }
 
-.section-heading h2 {
+.step-heading {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.step-heading h2 {
     font-weight: 300;
     margin-top: 1rem;
     font-size: 20px;
 }
 
-.btn,
-.btn-master-upload,
+/* ─── Control Panel ─── */
+.control-panel {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 1rem 0;
+    border-top: 1px solid var(--border-color);
+}
+/* ─── Unified Button / Link ─── */
+.ctrl-btn,
 .stat-button,
 .column-toggle-btn {
     min-height: 44px;
@@ -197,43 +215,41 @@ button:disabled {
     transition: background-color var(--ease-std), color var(--ease-std), border-color var(--ease-std), box-shadow var(--ease-std);
 }
 
-.btn,
-.btn-master-upload,
+.ctrl-btn,
 .stat-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    padding: 0.65rem 1rem;
+    padding: 0.65rem 1.15rem;
     border: 1px solid var(--border-strong);
     font-weight: 500;
+    font-size: 0.9rem;
     background: var(--bg-surface);
     color: var(--text-primary);
     white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
 }
 
-.btn-primary {
-    background: var(--primary-color);
+.ctrl-btn:not(:disabled):hover,
+.ctrl-btn:not(:disabled):focus-visible {
+    background: var(--bg-muted);
     border-color: var(--primary-color);
-    color: #ffffff;
+    box-shadow: var(--shadow-sm);
 }
 
-.btn-primary:not(:disabled):hover,
-.btn-primary:not(:disabled):focus-visible {
-    background: var(--primary-hover);
-    border-color: var(--primary-hover);
+.ctrl-btn:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
 }
 
-.btn:disabled {
-    opacity: 0.48;
-}
-
-.upload-section {
+/* ─── Upload Cards Row ─── */
+.upload-cards-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 1rem;
     align-items: stretch;
-    margin-bottom: 1.5rem;
 }
 
 .upload-card {
@@ -292,19 +308,6 @@ button:disabled {
     background-color: var(--border-strong);
 }
 
-.master-upload-wrapper {
-    grid-column: 1 / -1;
-    width: 100%;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
-}
-
-.btn-master-upload:hover,
 .stat-button:hover,
 .column-toggle-btn:hover {
     background: var(--bg-muted);
@@ -342,16 +345,29 @@ button:disabled {
     color: var(--error-text);
 }
 
-.bypass-checkbox-label {
+.bypass-master-label {
     display: inline-flex;
-    min-height: 44px;
     align-items: center;
-    gap: 0.55rem;
-    padding: 0.55rem 0.9rem;
-    background: var(--bg-surface);
+    gap: 0.5rem;
+    padding: 0.45rem 0.85rem;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    color: var(--text-primary);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background-color var(--ease-std), border-color var(--ease-std), color var(--ease-std);
+}
+
+.bypass-master-label:hover {
+    border-color: var(--border-strong);
+}
+
+.bypass-master-label:has(input:checked) {
+    background: var(--warning-bg);
+    border-color: var(--warning-text);
+    color: var(--warning-text);
 }
 
 input[type="checkbox"] {
@@ -359,12 +375,6 @@ input[type="checkbox"] {
     height: 20px;
     flex-shrink: 0;
     accent-color: var(--primary-color);
-}
-
-.bypass-checkbox-label:has(input:checked) {
-    background: var(--warning-bg);
-    border-color: var(--warning-text);
-    color: var(--warning-text);
 }
 
 .status-section {
@@ -784,13 +794,12 @@ tbody td:nth-child(20) {
     }
 
     .header-actions,
-    .btn-primary,
-    .btn-master-upload,
+    .ctrl-btn,
     .stat-button {
         width: 100%;
     }
 
-    .upload-section {
+    .upload-cards-row {
         grid-template-columns: 1fr;
     }
 
@@ -799,7 +808,7 @@ tbody td:nth-child(20) {
     }
 
     .master-file-badge,
-    .bypass-checkbox-label,
+    .bypass-master-label,
     .search-box,
     .column-picker-container {
         width: 100%;

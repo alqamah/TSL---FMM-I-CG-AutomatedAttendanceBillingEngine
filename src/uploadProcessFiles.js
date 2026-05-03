@@ -1,6 +1,6 @@
 // uploadProcessFiles.js
 // Handles all file upload events and file processing for both Presentee and PiPo report types.
-// Dependencies: hoursProcessing.js, persistent_data.js, main.js (employeeData, DOM refs)
+// Dependencies: hoursProcessing.js, main.js (employeeData, masterEmployeeDetails, masterFileUploaded, DOM refs)
 
 // -----------------------------------------------
 // PIPO FILE UPLOAD HANDLER
@@ -162,16 +162,16 @@ async function processPresenteeFile(file) {
                 const employeeId = String(row['Safety Pass No'] || '').trim();
                 const addLunch   = addLunchCheckbox ? addLunchCheckbox.checked : false;
 
-                // Enrich from persistent employee data (unless bypassed)
+                // Enrich from master-sheet employee data (if uploaded and not bypassed)
                 let skillVal         = null;
                 let designationVal   = null;
                 let shiftsAllowedVal = [];
                 let inOtAllowed      = false;
                 let outOtAllowed     = false;
 
-                const bypassPersistent = bypassPersistentDataCheckbox ? bypassPersistentDataCheckbox.checked : false;
-                if (!bypassPersistent && typeof employee_details !== 'undefined') {
-                    const empDetails = employee_details.find(e => e.sp_no === employeeId);
+                const bypassMaster = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
+                if (masterFileUploaded && !bypassMaster) {
+                    const empDetails = masterEmployeeDetails.find(e => e.sp_no === employeeId);
                     if (empDetails) {
                         skillVal         = empDetails.skill         || null;
                         designationVal   = empDetails.designation   || null;
@@ -371,7 +371,7 @@ async function processPipoFile(file) {
 
             const normalizedDate = emp.date ? normalizeDate(emp.date) : '';
 
-            // Enrich from persistent employee data (unless bypassed)
+            // Enrich from master-sheet employee data (if uploaded and not bypassed)
             let skillVal         = null;
             let designationVal   = null;
             let shiftsAllowedVal = [];
@@ -379,9 +379,9 @@ async function processPipoFile(file) {
             let outOtAllowed     = false;
             let nameVal          = '';
 
-            const bypassPersistent = bypassPersistentDataCheckbox ? bypassPersistentDataCheckbox.checked : false;
-            if (!bypassPersistent && typeof employee_details !== 'undefined') {
-                const empDetails = employee_details.find(e => e.sp_no === emp.sp_no);
+            const bypassMaster = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
+            if (masterFileUploaded && !bypassMaster) {
+                const empDetails = masterEmployeeDetails.find(e => e.sp_no === emp.sp_no);
                 if (empDetails) {
                     skillVal         = empDetails.skill         || null;
                     designationVal   = empDetails.designation   || null;

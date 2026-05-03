@@ -1,7 +1,7 @@
 // main.js
 // Application entry point: DOM references, shared state, column visibility,
 // sort state, table pre-render helpers, and event listener wiring.
-// Dependencies: persistent_data.js, hoursProcessing.js, uploadProcessFiles.js, renderTable.js
+// Dependencies: hoursProcessing.js, uploadProcessFiles.js, renderTable.js, masterFileUpload.js
 
 // -----------------------------------------------
 // DOM REFERENCES
@@ -16,7 +16,7 @@ const tableBody                   = document.getElementById('tableBody');
 const exportBtn                   = document.getElementById('exportBtn');
 const searchInput                 = document.getElementById('searchInput');
 const addLunchCheckbox            = document.getElementById('addLunchCheckbox');
-const bypassPersistentDataCheckbox= document.getElementById('bypassPersistentDataCheckbox');
+const bypassMasterFileCheckbox    = document.getElementById('bypassMasterFileCheckbox');
 const columnPickerBtn             = document.getElementById('columnPickerBtn');
 const columnPickerDropdown        = document.getElementById('columnPickerDropdown');
 const masterFileBtn               = document.getElementById('masterFileBtn');
@@ -28,6 +28,23 @@ const btnExitAggregate            = document.getElementById('btnExitAggregate');
 // -----------------------------------------------
 // SHARED STATE
 // -----------------------------------------------
+
+/** Flag: true after a master file has been successfully parsed & loaded. */
+let masterFileUploaded = false;
+
+/**
+ * Master-sheet employee details, populated by handleMasterFileUpload().
+ * Used to enrich CLM rows with skill, designation, shifts, OT permissions.
+ * Shape: [{ sp_no, name, designation, skill, allowedShifts[], inOtAllowed, outOtAllowed }, …]
+ */
+let masterEmployeeDetails = [];
+
+/**
+ * Shift definitions map, populated from the master sheet's Sheet 2.
+ * Shape: { shiftKey: { shiftIn: 'HH:MM', shiftOut: 'HH:MM' }, … }
+ * Starts empty — assignShift() will return 'NA' until a master file is loaded.
+ */
+let SHIFT_DEFINITIONS = {};
 
 /**
  * Master employee-data array.
@@ -264,22 +281,26 @@ function reprocessData() {
 // -----------------------------------------------
 // EVENT LISTENERS
 // -----------------------------------------------
-fileInput.addEventListener('change', handlePresenteeFileSelect);
-if (pipoInput)          pipoInput.addEventListener('change',  handlePipoFileSelect);
-exportBtn.addEventListener('click',  exportToExcel);
-if (dataTable) {
-    dataTable.addEventListener('click', event => {
-        const button = event.target.closest('[data-sort-key]');
-        if (!button) return;
-        toggleSort(button.dataset.sortKey);
-    });
-}
-if (searchInput)        searchInput.addEventListener('input',  renderTable);
-if (addLunchCheckbox)   addLunchCheckbox.addEventListener('change', reprocessData);
-if (masterFileBtn && masterFileInput) {
-    masterFileBtn.addEventListener('click', () => masterFileInput.click());
-}
-if (masterFileInput)    masterFileInput.addEventListener('change', handleMasterFileUpload);
-if (btnEmployeeTotal)   btnEmployeeTotal.addEventListener('click', employeewiseTotalHours);
-if (btnSkillTotal)      btnSkillTotal.addEventListener('click', skillwiseTotalHours);
-if (btnExitAggregate)   btnExitAggregate.addEventListener('click', reprocessData);
+// Deferred: main.js loads first, so functions from other scripts are not yet defined.
+// window 'load' fires after all scripts have been parsed and executed.
+window.addEventListener('load', () => {
+    fileInput.addEventListener('change', handlePresenteeFileSelect);
+    if (pipoInput)          pipoInput.addEventListener('change',  handlePipoFileSelect);
+    exportBtn.addEventListener('click',  exportToExcel);
+    if (dataTable) {
+        dataTable.addEventListener('click', event => {
+            const button = event.target.closest('[data-sort-key]');
+            if (!button) return;
+            toggleSort(button.dataset.sortKey);
+        });
+    }
+    if (searchInput)        searchInput.addEventListener('input',  renderTable);
+    if (addLunchCheckbox)   addLunchCheckbox.addEventListener('change', reprocessData);
+    if (masterFileBtn && masterFileInput) {
+        masterFileBtn.addEventListener('click', () => masterFileInput.click());
+    }
+    if (masterFileInput)    masterFileInput.addEventListener('change', handleMasterFileUpload);
+    if (btnEmployeeTotal)   btnEmployeeTotal.addEventListener('click', employeewiseTotalHours);
+    if (btnSkillTotal)      btnSkillTotal.addEventListener('click', skillwiseTotalHours);
+    if (btnExitAggregate)   btnExitAggregate.addEventListener('click', reprocessData);
+});

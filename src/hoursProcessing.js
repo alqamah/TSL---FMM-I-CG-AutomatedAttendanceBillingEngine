@@ -1,6 +1,6 @@
 // hoursProcessing.js
 // Date/time normalisation, shift assignment, and hours calculation functions.
-// Dependencies: persistent_data.js (SHIFT_DEFINITIONS, employee_details)
+// Dependencies: main.js (SHIFT_DEFINITIONS, masterEmployeeDetails)
 
 // -----------------------------------------------
 // DATE & TIME NORMALISATION FUNCTIONS
@@ -227,8 +227,8 @@ function calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shiftStr, add
 function calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins) {
     if (shiftOutMins === null || dutyOutMins === null || dutyInMins === null || shiftInMins === null) return 0;
 
-    const empDetails = (typeof employee_details !== 'undefined')
-        ? employee_details.find(e => e.sp_no === employeeId)
+    const empDetails = (typeof masterEmployeeDetails !== 'undefined' && masterEmployeeDetails.length > 0)
+        ? masterEmployeeDetails.find(e => e.sp_no === employeeId)
         : null;
 
     if (!empDetails) return 0;
