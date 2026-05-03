@@ -313,6 +313,8 @@ async function processPipoFile(file) {
             const time        = row['Punch Time/HH:MM:SS'] || row['Punch Time'] || '';
             const vendorName  = row['Vendor Name']  || '';
             const workorderNo = row['Workorder No'] || '';
+            const workmanName = row['Workman Name'] || row['Employee Name'] || '';
+            const deptName    = row['Dept. Name'] || row['Department Name'] || '';
 
             if (!spNo) return;
 
@@ -321,7 +323,9 @@ async function processPipoFile(file) {
                     date,
                     [spNo]: {},
                     vendor_name:   vendorName,
-                    workorder_no:  workorderNo
+                    workorder_no:  workorderNo,
+                    workman_name:  workmanName,
+                    dept_name:     deptName
                 };
             }
 
@@ -339,7 +343,9 @@ async function processPipoFile(file) {
             const date        = record.date;
             const vendorName  = record.vendor_name;
             const workorderNo = record.workorder_no;
-            const spNo        = Object.keys(record).find(k => k !== 'date' && k !== 'vendor_name' && k !== 'workorder_no');
+            const workmanName = record.workman_name || '';
+            const deptName    = record.dept_name    || '';
+            const spNo        = Object.keys(record).find(k => k !== 'date' && k !== 'vendor_name' && k !== 'workorder_no' && k !== 'workman_name' && k !== 'dept_name');
 
             let punchIn  = null;
             let punchOut = null;
@@ -355,7 +361,7 @@ async function processPipoFile(file) {
                 if (validOut.length > 0) punchOut = Math.max(...validOut);
             }
 
-            return { date, sp_no: spNo, punchIn, punchOut, vendorName, workorderNo };
+            return { date, sp_no: spNo, punchIn, punchOut, vendorName, workorderNo, workmanName, deptName };
         });
 
         console.log('pipoEmployeeDetails:', pipoEmployeeDetails);
@@ -377,7 +383,7 @@ async function processPipoFile(file) {
             let shiftsAllowedVal = [];
             let inOtAllowed      = false;
             let outOtAllowed     = false;
-            let nameVal          = '';
+            let nameVal          = emp.workmanName || '';  // default from CLM punch data
 
             const bypassMaster = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
             if (masterFileUploaded && !bypassMaster) {
@@ -388,7 +394,7 @@ async function processPipoFile(file) {
                     shiftsAllowedVal = empDetails.allowedShifts || [];
                     inOtAllowed      = !!empDetails.inOtAllowed;
                     outOtAllowed     = !!empDetails.outOtAllowed;
-                    nameVal          = empDetails.name          || '';
+                    nameVal          = empDetails.name          || nameVal;
                 }
             }
 
@@ -419,7 +425,7 @@ async function processPipoFile(file) {
                 name:          nameVal,
                 vendor_name:   emp.vendorName   || '',
                 workorder_no:  emp.workorderNo  || '',
-                dept_name:     '',
+                dept_name:     emp.deptName      || '',
                 section:       '',
                 skill:         skillVal,
                 inOT:          inOtAllowed,
