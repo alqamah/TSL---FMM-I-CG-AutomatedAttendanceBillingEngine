@@ -26,6 +26,8 @@ async function handlePipoFileSelect(event) {
             await processPipoFile(file);
         }
 
+        _mergeDuplicatePipoRows();
+
         renderTable();
 
         if (employeeData.length > 0) {
@@ -45,6 +47,95 @@ async function handlePipoFileSelect(event) {
 // -----------------------------------------------
 
 const C_SHIFT_THRESHOLD_MINS = 20 * 60; // 20:00 — evening punch-in signals C-shift
+
+// Shared row helpers
+
+/**
+ * Recalculates shift, duty hours, and OT for an already-normalised employee row.
+ */
+function _recalculateEmployeeRow(row) {
+    const inTime  = row.punchIn;
+    const outTime = row.punchOut;
+
+    const shift = assignShift(row.sp_no, inTime, outTime);
+    let shiftIn = '', shiftOut = '';
+    let shiftInMins = null, shiftOutMins = null;
+
+    if (shift && SHIFT_DEFINITIONS[shift]) {
+        shiftIn      = SHIFT_DEFINITIONS[shift].shiftIn;
+        shiftOut     = SHIFT_DEFINITIONS[shift].shiftOut;
+        shiftInMins  = parseTimeFormatToMinutes(shiftIn);
+        shiftOutMins = parseTimeFormatToMinutes(shiftOut);
+    }
+
+    const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, row.inOT, row.outOT);
+    const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, row.addLunch);
+    const otHours    = calculateOtHours(row.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
+
+    row.shift      = shift;
+    row.shiftIn    = shiftIn;
+    row.shiftOut   = shiftOut;
+    row.dutyIn     = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
+    row.dutyOut    = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
+    row.dutyHours  = parseFloat(dutyHours.toFixed(2));
+    row.otHours    = parseFloat(otHours.toFixed(2));
+    row.totalHours = parseFloat((dutyHours + otHours).toFixed(2));
+}
+
+/**
+ * PiPo uploads can contain overlapping files. Collapse duplicate employee/date
+ * rows into one row by keeping the earliest punch-in and latest punch-out.
+ */
+function _mergeDuplicatePipoRows() {
+    const byEmployeeDate = new Map();
+
+    employeeData.forEach(row => {
+        const key = `${row.sp_no || ''}||${row.date || ''}`;
+        if (!byEmployeeDate.has(key)) byEmployeeDate.set(key, []);
+        byEmployeeDate.get(key).push(row);
+    });
+
+    const mergedRows = [];
+
+    byEmployeeDate.forEach(rows => {
+        if (rows.length === 1) {
+            mergedRows.push(rows[0]);
+            return;
+        }
+
+        const target = rows[0];
+        const inCandidates = rows
+            .map(row => parseTimeFormatToMinutes(row.punchIn))
+            .filter(mins => mins !== null);
+
+        if (inCandidates.length > 0) {
+            const earliestIn = Math.min(...inCandidates);
+            target.punchIn = formatMinutesTo24h(earliestIn);
+
+            let latestOut = null;
+            let latestOutNextDate = null;
+
+            rows.forEach(row => {
+                const outMins = parseTimeFormatToMinutes(row.punchOut);
+                if (outMins === null) return;
+
+                const comparableOut = (row.punchOutNextDate || outMins < earliestIn) ? outMins + 1440 : outMins;
+                if (latestOut === null || comparableOut > latestOut) {
+                    latestOut = comparableOut;
+                    latestOutNextDate = row.punchOutNextDate || null;
+                }
+            });
+
+            target.punchOut = latestOut !== null ? formatMinutesTo24h(latestOut % 1440) : '';
+            target.punchOutNextDate = latestOutNextDate;
+            _recalculateEmployeeRow(target);
+        }
+
+        mergedRows.push(target);
+    });
+
+    employeeData = mergedRows;
+}
 
 /**
  * Parses a normalised date string (DD-MM-YYYY or D-Mon-YY) into a sortable ms timestamp.
