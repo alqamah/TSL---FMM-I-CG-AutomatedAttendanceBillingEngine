@@ -33,7 +33,8 @@
             <!-- ── Step 1 ── -->
             <section class="step-block" aria-labelledby="uploadHeading">
                 <div class="step-heading">
-                    <h2 id="uploadHeading"><b class="step-number">Step 1:</b> Upload the Master Sheet containing the details of the Employees</h2>
+                    <h2 id="uploadHeading"><b class="step-number">Step 1:</b> Upload the Master Sheet containing the
+                        details of the Employees</h2>
                     <label class="bypass-master-label"
                         title="When checked, the tool will skip the Master File and use only the CLM data">
                         <input type="checkbox" id="bypassMasterFileCheckbox">
@@ -74,16 +75,20 @@
             <!-- ── Step 2 ── -->
             <section class="step-block" aria-labelledby="clmHeading">
                 <div class="step-heading">
-                    <h2 id="clmHeading"><b class="step-number">Step 2:</b> Upload the CLM Reports downloaded from the portal</h2>
+                    <h2 id="clmHeading"><b class="step-number">Step 2:</b> Upload the CLM Reports downloaded from the
+                        portal</h2>
                 </div>
                 <div id="clmUploadWarning" class="clm-upload-warning is-hidden">
                     <svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <path
+                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                        </path>
                         <line x1="12" y1="9" x2="12" y2="13"></line>
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>
                     </svg>
-                    <span>Please upload a <b>Master File</b> in Step 1, or check <b>Bypass Master-Sheet</b> to continue without one.</span>
+                    <span>Please upload a <b>Master File</b> in Step 1, or check <b>Bypass Master-Sheet</b> to continue
+                        without one.</span>
                 </div>
                 <div class="upload-cards-row" id="clmUploadCardsRow">
                     <label class="upload-card" for="fileInput" id="upload-presentee">
@@ -94,12 +99,12 @@
                             from CLM.</span>
                         <input type="file" id="fileInput" class="sr-only" accept=".xls,.xlsx" multiple>
                     </label>
-                        <h4>OR</h4>
+                    <h4>OR</h4>
                     <label class="upload-card" for="pipoInput" id="upload-pipo">
                         <div class="upload-icon">
                             <img src="../assets/2.png" alt="" class="app-logo clm-logo" aria-hidden="true">
                         </div>
-                        <span class="upload-helper">Select one or more <b>Punch-in / Punch-out</b> Excel Sheets
+                        <span class="upload-helper">Select one or more <b>Punch-in/Punch-out</b> Excel Sheets
                             downloaded from CLM.</span>
                         <input type="file" id="pipoInput" class="sr-only" accept=".xls,.xlsx" multiple>
                     </label>
@@ -160,8 +165,9 @@
 
                         <button id="exportBtn" class="stat-button badge" disabled
                             aria-label="Export calculated working hours to XLSX">
-                            <svg aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="2.5"
-                                viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" height="16" width="16">
+                            <svg aria-hidden="true" focusable="false" stroke="currentColor" fill="none"
+                                stroke-width="2.5" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"
+                                height="16" width="16">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                                 <polyline points="7 10 12 15 17 10"></polyline>
                                 <line x1="12" y1="15" x2="12" y2="3"></line>
