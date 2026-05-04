@@ -1,259 +1,1005 @@
 ================================================
-FILE: readme.md
+FILE: src/hoursProcessing.js
 ================================================
-# Working Hours Calculator
+// hoursProcessing.js
+// Date/time normalisation, shift assignment, and hours calculation functions.
+// Dependencies: main.js (SHIFT_DEFINITIONS, masterEmployeeDetails)
 
-This application calculates the exact total working hours, duty hours, and overtime (OT) for employees based on uploaded CLM (Contract Labor Management) punch-in and punch-out data. Designed to seamlessly handle complex payroll edge cases, this tool automatically assigns accurate shifts, enforces custom overtime logic, and generates reliable reporting aggregates.
+// -----------------------------------------------
+// DATE & TIME NORMALISATION FUNCTIONS
+// -----------------------------------------------
 
-### Key Features
-- **Smart Shift Allocation:** Automatically detects and assigns the appropriate shift based on punch-in/out times matching against the employee's allowed shifts list (CLM shift allocation is discarded).
-- **Advanced Aggregation:** Instantly aggregates parsed data into skill-wise and employee-wise hour breakdowns.
-- **Accurate Time Tracking:** Processes custom duty-hour calculations and strict block overtime increments according to duty logic rules, i.e. employee specific rules.
-- **Flexible Adjustments:** Includes an optional toggle to factor lunch hour deductions into the net total working hours.
-- **One-Click Exporting:** Directly export attendance data and processed aggregations to `.xlsx` files.
-- **Search Functionality:** Search bar to search in Name, ID and Date.
-- #### Local Database
-- **Persistent Data:** Employee details are stored in `persistent_data.js` file. This file is used to store employee details such as name, skill, designation, allowed shifts, allowed OT, etc. This file is used to store employee details such as name, skill, designation, allowed shifts, allowed OT, etc.
+/**
+ * Converts a time string (e.g. "06:30", "6.30", "6:30 AM") to minutes since midnight.
+ * Returns null if the string cannot be parsed.
+ */
+function parseTimeFormatToMinutes(timeStr) {
+    try {
+        // Regex to match HH:MM, HH:MM:SS, HH.MM, H AM/PM, etc.
+        const timeMatch = String(timeStr).trim().match(/^(\d{1,2})[:.]?(\d{2})?[:.]?(\d{2})?\s*([aApP][mM])?$/);
+        if (!timeMatch) return null;
 
-### Duty In (Check-In) Time Logic
+        let hours = parseInt(timeMatch[1], 10);
+        const mins = parseInt(timeMatch[2] || '0', 10);
+        // We ignore seconds (timeMatch[3]) as the tool calculates based on minutes.
+        const period = timeMatch[4] ? timeMatch[4].toUpperCase() : null;
 
-| Scenario | Condition | Duty In Assigned | Example |
-| :--- | :--- | :--- | :--- |
-| **Early OT** | Checked in > 59 mins early AND `allowedOT.in` is true | Rounded UP to the next 30 minutes | Shift 08:30. Arrived 06:50 ➔ Duty In 07:00 |
-| **Normal / Grace** | Checked in anywhere up to 15 mins late OR slightly early | Exact Shift In time | Shift 08:30. Arrived 08:42 ➔ Duty In 08:30 |
-| **Late** | Checked in > 15 mins late | Rounded UP to the next 30 minutes (Penalty) | Shift 08:30. Arrived 08:47 ➔ Duty In 09:00 |
+        if (period === 'PM' && hours < 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
 
-### Duty Out (Check-Out) Time Logic
+        return hours * 60 + mins;
+    } catch (err) {
+        console.error('parseTimeFormatToMinutes error:', err);
+        return null;
+    }
+}
 
-| Scenario | Condition | Duty Out Assigned | Example |
-| :--- | :--- | :--- | :--- |
-| **Early Leaver** | Pulled out before shift end time | Rounded DOWN to previous 30 minutes (Penalty) | Shift ends 17:30. Left 17:15 ➔ Duty Out 17:00 |
-| **OT Out** | Stayed past shift end AND `allowedOT.out` is true | Rounded DOWN to previous 30 minutes | Shift ends 17:30. Left 18:25 ➔ Duty Out 18:00 |
-| **Normal Leave** | Left at or past shift end but no OT allowed | Exact Shift Out time | Shift ends 17:30. Left 18:15 ➔ Duty Out 17:30 |
+/**
+ * Formats minutes since midnight to a "HH:MM" 24-hour string.
+ */
+function formatMinutesTo24h(totalMinutes) {
+    try {
+        const hours = Math.floor(totalMinutes / 60);
+        const mins = totalMinutes % 60;
+        return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    } catch (err) {
+        console.error('formatMinutesTo24h error:', err);
+        return '';
+    }
+}
 
-### Overtime (OT) Policy
-- All computed Overtime (OT) is automatically floored and allotted  in **30-minute chunks** (0.5 hour integers). 
+/**
+ * Normalises a raw date string to a clean DD-MM-YYYY (or similar) format.
+ * Replaces slashes with dashes and strips garbage from regex captures.
+ */
+function normalizeDate(dateStr) {
+    try {
+        if (!dateStr) return 'N/A';
 
-### Shift Definitions
+        let clean = dateStr.replace(/\//g, '-').trim();
 
-| Shift Code | Shift In | Shift Out |
-| :--- | :--- | :--- |
-| **A** | 06:00 | 14:00 |
-| **B** | 14:00 | 22:00 |
-| **C** | 22:00 | 06:00 |
-| **W1** | 08:30 | 17:30 |
-| **G** | 08:00 | 17:00 |
+        const strictMatch = clean.match(/(\d{1,2}[-\s/]\d{1,2}[-\s/]\d{2,4})/);
+        if (strictMatch) {
+            clean = strictMatch[1].replace(/\s+/g, '-');
+        }
+
+        return clean;
+    } catch (err) {
+        console.error('normalizeDate error:', err);
+        return 'N/A';
+    }
+}
+
+/**
+ * Parses a date string (DD-MM-YYYY or DD/MM/YYYY) into a sortable timestamp (ms).
+ */
+function parseSortableDate(dateStr) {
+    try {
+        if (!dateStr || dateStr === 'N/A') return 0;
+        const parts = dateStr.split(/[-\/]/);
+        if (parts.length === 3) {
+            const day   = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const year  = parseInt(parts[2], 10);
+            return new Date(year, month, day).getTime();
+        }
+        return 0;
+    } catch (err) {
+        console.error('parseSortableDate error:', err);
+        return 0;
+    }
+}
+
+// -----------------------------------------------
+// HOURS CALCULATION FUNCTIONS
+// -----------------------------------------------
+
+/**
+ * Calculates duty-in and duty-out (in minutes) from punch times and shift boundaries.
+ * Applies OT grace/penalty rules (round to nearest 30 min).
+ *
+ * @returns {{ dutyInMins: number|null, dutyOutMins: number|null }}
+ */
+function calculateHours(inTimeStr, outTimeStr, shiftInStr, shiftOutStr, allowedOtIn, allowedOtOut) {
+    try {
+        if (
+            !inTimeStr || !outTimeStr ||
+            String(inTimeStr).toLowerCase()  === 'off' ||
+            String(outTimeStr).toLowerCase() === 'off'
+        ) {
+            return { dutyInMins: null, dutyOutMins: null };
+        }
+
+        const inMins       = parseTimeFormatToMinutes(inTimeStr);
+        const outMins      = parseTimeFormatToMinutes(outTimeStr);
+        const shiftInMins  = shiftInStr  ? parseTimeFormatToMinutes(shiftInStr)  : null;
+        const shiftOutMins = shiftOutStr ? parseTimeFormatToMinutes(shiftOutStr) : null;
+
+        if (inMins === null || outMins === null) {
+            return { dutyInMins: null, dutyOutMins: null };
+        }
+
+        let dutyInMins  = inMins;
+        let dutyOutMins = outMins;
+
+        // Guard: if punch-in and punch-out are < 60 min apart, treat as zero-hour day
+        // (also prevents erroneous Night-Shift allocation, e.g. 06:01 → 06:10)
+        let diffRaw = outMins - inMins;
+        if (diffRaw < 0) diffRaw += 1440; // wrap around midnight
+
+        if (diffRaw < 60) {
+            return { dutyInMins: inMins, dutyOutMins: inMins };
+        }
+
+        // --- IN TIME LOGIC ---
+        if (shiftInMins !== null) {
+            let nInMins = inMins;
+            // Handle cross-day discrepancy (e.g. shift starts 22:00, punched at 01:00)
+            if (inMins < shiftInMins - 720) nInMins += 1440;
+            else if (inMins > shiftInMins + 720) nInMins -= 1440;
+
+            if (nInMins > shiftInMins + 15) {
+                // Late check-in: round UP to nearest 30 min (penalty)
+                let r = Math.ceil(nInMins / 30) * 30;
+                dutyInMins = (r % 1440 + 1440) % 1440;
+            } else if (allowedOtIn && (shiftInMins - nInMins > 29)) {
+                // Early OT: round UP to nearest 30 min (reward)
+                let r = Math.ceil(nInMins / 30) * 30;
+                dutyInMins = (r % 1440 + 1440) % 1440;
+            } else {
+                // Normal / within grace period
+                dutyInMins = shiftInMins;
+            }
+        } else {
+            // No shift assigned – round both ends to nearest 30
+            dutyInMins  = Math.ceil(inMins  / 30) * 30;
+            dutyOutMins = Math.floor(outMins / 30) * 30;
+        }
+
+        // --- OUT TIME LOGIC ---
+        if (shiftOutMins !== null && shiftInMins !== null) {
+            let nOutMins  = outMins;
+            if (outMins < inMins) nOutMins += 1440;
+
+            let nShiftOut = shiftOutMins;
+            if (shiftOutMins < shiftInMins) nShiftOut += 1440;
+
+            if (nOutMins < nShiftOut) {
+                // Early leaver: round DOWN to nearest 30 min (penalty)
+                let r = Math.floor(nOutMins / 30) * 30;
+                dutyOutMins = (r % 1440 + 1440) % 1440;
+            } else if (allowedOtOut) {
+                // OT out: round DOWN to nearest 30 min (reward)
+                let r = Math.floor(nOutMins / 30) * 30;
+                dutyOutMins = (r % 1440 + 1440) % 1440;
+            } else {
+                // Normal departure – cap at shift end
+                dutyOutMins = shiftOutMins;
+            }
+        } else if (shiftOutMins !== null) {
+            dutyOutMins = shiftOutMins;
+        }
+
+        return { dutyInMins, dutyOutMins };
+    } catch (err) {
+        console.error('calculateHours error:', err);
+        return { dutyInMins: null, dutyOutMins: null };
+    }
+}
+
+/**
+ * Calculates net duty hours from duty-in/out, honouring max-duty caps and lunch deduction.
+ */
+function calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shiftStr, addLunch) {
+    if (dutyInMins === null || dutyOutMins === null) return 0;
+
+    const endMins = shiftOutMins !== null ? shiftOutMins : dutyOutMins;
+
+    let diffActual = dutyOutMins - dutyInMins;
+    if (dutyOutMins < dutyInMins) diffActual += 1440;
+
+    let diffShift = endMins - dutyInMins;
+    if (endMins < dutyInMins) diffShift += 1440;
+
+    let diffMins = Math.min(diffActual, diffShift);
+    if (diffMins < 0) diffMins = 0;
+
+    let totalHours = diffMins / 60;
+    let maxDuty    = 8;
+
+    if (shiftStr === 'G' || shiftStr === 'W1') {
+        if (!addLunch) {
+            totalHours = Math.max(0, totalHours - 1); // deduct 1-hour lunch break
+        } else {
+            maxDuty = 9;
+        }
+    }
+
+    let dutyHours = Math.min(maxDuty, totalHours);
+
+    if (diffActual < 30) {
+        dutyHours = 0;
+    }
+
+    return dutyHours;
+}
+
+/**
+ * Calculates OT hours (in decimal) for an employee.
+ * OT is only granted for >= 1 full hour before/after the shift boundary.
+ * Result is rounded down to the nearest 0.5 h.
+ */
+function calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins) {
+    if (shiftOutMins === null || dutyOutMins === null || dutyInMins === null || shiftInMins === null) return 0;
+
+    const empDetails = (typeof masterEmployeeDetails !== 'undefined' && masterEmployeeDetails.length > 0)
+        ? masterEmployeeDetails.find(e => e.sp_no === employeeId)
+        : null;
+
+    if (!empDetails) return 0;
+
+    let inOt = 0, outOt = 0;
+
+    // Midnight-aware signed difference
+    function getDiff(target, actual, isArrival) {
+        let d = isArrival ? (target - actual) : (actual - target);
+        if (d < -720) d += 1440;
+        if (d >  720) d -= 1440;
+        return d;
+    }
+
+    if (empDetails.inOtAllowed) {
+        const diffIn = getDiff(shiftInMins, dutyInMins, true);
+        if (diffIn > 59) inOt = diffIn;
+    }
+
+    if (empDetails.outOtAllowed) {
+        const diffOut = getDiff(shiftOutMins, dutyOutMins, false);
+        if (diffOut > 59) outOt = diffOut;
+    }
+
+    // Round down to nearest 0.5 h
+    const totalOtMins = inOt + outOt;
+    const otHours     = Math.floor(totalOtMins / 30) * 0.5;
+
+    return otHours;
+}
+
+// -----------------------------------------------
+// SHIFT ASSIGNMENT
+// -----------------------------------------------
+
+/**
+ * Assigns the best matching shift key for an employee based on punch-in / punch-out times.
+ * Priority: A/B/C shifts matched via punch-in proximity → fallback via punch-out proximity
+ *           → G/W1 general shifts matched via combined proximity + estimated working hours.
+ *
+ * @returns {string} Shift key (e.g. 'A', 'B', 'C', 'G', 'W1', or 'NA')
+ */
+function assignShift(employeeId, punchIn, punchOut) {
+    try {
+        const punchInMins  = punchIn  ? parseTimeFormatToMinutes(punchIn)  : null;
+        const punchOutMins = punchOut ? parseTimeFormatToMinutes(punchOut) : null;
+
+        const abcShifts = ['A', 'B', 'C'];
+        const gwShifts  = ['G', 'W1'];
+
+        let bestShift = 'NA';
+        let bestDiff  = Infinity;
+
+        // Midnight-aware absolute difference
+        function timeDiff(a, b) {
+            let d = Math.abs(a - b);
+            if (d > 720) d = 1440 - d;
+            return d;
+        }
+
+        // Step 1a: Match A/B/C via punch-in proximity to shiftIn
+        if (punchInMins !== null) {
+            abcShifts.forEach(shiftKey => {
+                const def = SHIFT_DEFINITIONS[shiftKey];
+                if (!def) return;
+                const target = parseTimeFormatToMinutes(def.shiftIn);
+                if (target === null) return;
+
+                const diff = timeDiff(punchInMins, target);
+                if (diff <= 120 && diff < bestDiff) {
+                    bestDiff  = diff;
+                    bestShift = shiftKey;
+                }
+            });
+        }
+
+        // Step 1b: Fallback – match A/B/C via punch-out proximity to shiftOut
+        if (bestShift === 'NA' && punchOutMins !== null) {
+            abcShifts.forEach(shiftKey => {
+                const def = SHIFT_DEFINITIONS[shiftKey];
+                if (!def) return;
+                const target = parseTimeFormatToMinutes(def.shiftOut);
+                if (target === null) return;
+
+                const diff = timeDiff(punchOutMins, target);
+                if (diff <= 120 && diff < bestDiff) {
+                    bestDiff  = diff;
+                    bestShift = shiftKey;
+                }
+            });
+        }
+
+        // Step 2: Evaluate G/W1 via combined proximity + estimated working hours
+        const gwCandidates = [];
+        gwShifts.forEach(shiftKey => {
+            const def = SHIFT_DEFINITIONS[shiftKey];
+            if (!def) return;
+
+            const shiftInMins  = parseTimeFormatToMinutes(def.shiftIn);
+            const shiftOutMins = parseTimeFormatToMinutes(def.shiftOut);
+            if (shiftInMins === null || shiftOutMins === null) return;
+
+            let totalDiff  = 0;
+            let matchCount = 0;
+
+            if (punchInMins  !== null) { totalDiff += timeDiff(punchInMins,  shiftInMins);  matchCount++; }
+            if (punchOutMins !== null) { totalDiff += timeDiff(punchOutMins, shiftOutMins); matchCount++; }
+
+            if (matchCount > 0) {
+                const avgDiff = totalDiff / matchCount;
+                if (avgDiff <= 120) {
+                    const effectiveIn  = punchInMins  !== null ? Math.max(punchInMins,  shiftInMins)  : shiftInMins;
+                    const effectiveOut = punchOutMins !== null ? Math.min(punchOutMins, shiftOutMins) : shiftOutMins;
+                    let estMins = effectiveOut - effectiveIn;
+                    if (estMins < 0)    estMins += 1440;
+                    if (estMins > 720)  estMins = 0; // sanity cap
+
+                    gwCandidates.push({ shiftKey, avgDiff, estMins });
+                }
+            }
+        });
+
+        // Pick best G/W1: if proximity scores are within 30 min, prefer the higher-hours shift
+        if (gwCandidates.length > 0) {
+            gwCandidates.sort((a, b) => {
+                const diffGap = Math.abs(a.avgDiff - b.avgDiff);
+                if (diffGap <= 30) {
+                    const hoursDiff = b.estMins - a.estMins;
+                    if (hoursDiff !== 0) return hoursDiff;
+                    return a.avgDiff - b.avgDiff;
+                }
+                return a.avgDiff - b.avgDiff;
+            });
+
+            const topGw = gwCandidates[0];
+            if (topGw.avgDiff < bestDiff) {
+                bestDiff  = topGw.avgDiff;
+                bestShift = topGw.shiftKey;
+            }
+        }
+
+        console.log(`assignShift: ${employeeId} → punchIn=${punchIn}, punchOut=${punchOut}, assigned=${bestShift}`);
+        return bestShift;
+    } catch (err) {
+        console.error('assignShift error:', err);
+        return 'NA';
+    }
+}
+
 
 
 ================================================
-FILE: todo.txt
+FILE: src/main.js
 ================================================
-Fix shift allocation for w1.  ✅
-Add search bar
-Add download btn
+// main.js
+// Application entry point: DOM references, shared state, column visibility,
+// sort state, table pre-render helpers, and event listener wiring.
+// Dependencies: hoursProcessing.js, uploadProcessFiles.js, renderTable.js, masterFileUpload.js
 
-correct the logic for night shift ✅
-wrong output 
-32	03-02-2026	VD0722561172	RUPESH KUMAR	B445	U			18:34	06:02	19:00	06:00	0	0	0
+// -----------------------------------------------
+// DOM REFERENCES
+// -----------------------------------------------
+const fileInput                   = document.getElementById('fileInput');
+const pipoInput                   = document.getElementById('pipoInput');
+const statusSection               = document.getElementById('statusSection');
+const fileStatusList              = document.getElementById('fileStatusList');
+const fileCountBadge              = document.getElementById('fileCountBadge');
+const dataTable                   = document.getElementById('dataTable');
+const tableBody                   = document.getElementById('tableBody');
+const exportBtn                   = document.getElementById('exportBtn');
+const searchInput                 = document.getElementById('searchInput');
+const addLunchCheckbox            = document.getElementById('addLunchCheckbox');
+const bypassMasterFileCheckbox    = document.getElementById('bypassMasterFileCheckbox');
+const columnPickerBtn             = document.getElementById('columnPickerBtn');
+const columnPickerDropdown        = document.getElementById('columnPickerDropdown');
+const masterFileBtn               = document.getElementById('masterFileBtn');
+const masterFileInput             = document.getElementById('masterFileInput');
+const btnEmployeeTotal            = document.getElementById('btnEmployeeTotal');
+const btnSkillTotal               = document.getElementById('btnSkillTotal');
+const btnExitAggregate            = document.getElementById('btnExitAggregate');
 
+// -----------------------------------------------
+// SHARED STATE
+// -----------------------------------------------
 
-Drivers:
-//Chottu Lohar
+/** Flag: true after a master file has been successfully parsed & loaded. */
+let masterFileUploaded = false;
 
-1. Sujit Kr. Vishwakarma - RD0721287965
-2. Nalin Mahato - RD0918134974
-3. Rupesh Kumar -VD0722561172
-4. Laxman Bhaduk - RW0305045827
-5. Raju Kalindi - RD1203000744
-6. Nipen Ch. Shukul - RW0807096365
+/**
+ * Master-sheet employee details, populated by handleMasterFileUpload().
+ * Used to enrich CLM rows with skill, designation, shifts, OT permissions.
+ * Shape: [{ sp_no, name, designation, skill, allowedShifts[], inOtAllowed, outOtAllowed }, …]
+ */
+let masterEmployeeDetails = [];
 
-Perform search only on Name, ID and Date
+/**
+ * Default shift definitions — used when no master sheet is uploaded
+ * or the master sheet does not contain a shift_definitions sheet.
+ */
+const DEFAULT_SHIFT_DEFINITIONS = {
+    'A':  { shiftIn: '06:00', shiftOut: '14:00' },
+    'B':  { shiftIn: '14:00', shiftOut: '22:00' },
+    'C':  { shiftIn: '22:00', shiftOut: '06:00' },
+    'W1': { shiftIn: '08:30', shiftOut: '17:30' },
+    'G':  { shiftIn: '08:00', shiftOut: '17:00' }
+};
 
-v3.0
-05/03: ✅
-1. shift allocation logic for drivers is not working for C Shift + OT. Need to hardcode the shift allocation for C shift wrt duty in-out time.
-2. for shifts G and W1, deduct 1h lunch from duty hours.
+/**
+ * Active shift definitions map.
+ * Starts with defaults; overwritten from the master sheet's Sheet 2 if available.
+ * Shape: { shiftKey: { shiftIn: 'HH:MM', shiftOut: 'HH:MM' }, … }
+ */
+let SHIFT_DEFINITIONS = { ...DEFAULT_SHIFT_DEFINITIONS };
 
+/**
+ * Master employee-data array.
+ * Populated by processPresenteeFile / processPipoFile.
+ *
+ * Each entry shape:
+ * {
+ *   date, sp_no, name, vendor_name, workorder_no, dept_name, section,
+ *   skill, designation, shiftsAllowed[], shift, shiftIn, shiftOut,
+ *   punchIn, punchOut, dutyIn, dutyOut, addLunch,
+ *   dutyHours, otHours, totalHours, inOT, outOT
+ * }
+ */
+let employeeData = [];
 
-v3.5
-18/03:
-1. Assign Shift based on nearest time. Do not consider CLM. -> use mean of nearest time else, 1h+ for far-away shifts. ✅
-2. Use allowed shifts array. ✅
-3. Sort date in final report. ✅
+// -----------------------------------------------
+// COLUMN VISIBILITY
+// -----------------------------------------------
 
-v4
-19/03:
-1. Allow OT based on allowedOT array for IN and/or OUT. Implement this in hours calculation logic. ✅
-2. Separate OT calc. function. ✅
-3. persistent data alternative: create an xlsx downloadable table containing
-    SP_NO, NAME, SKILL, DESIGNATION, ALLOWED_SHIFTS, ALLOWED_OT_IN, ALLOWED_OT_OUT
-    Create an upload section to upload this xlsx file. Bypass the persistent data and use uploaded data after cleaning it. 
+const dynamicStyle = document.createElement('style');
+dynamicStyle.id = 'dynamicColumnStyles';
+document.head.appendChild(dynamicStyle);
+
+const COLUMN_DEFS = [
+    { id: 'SN',            label: 'SN',            defaultVisible: true },
+    { id: 'DATE',          label: 'DATE',           defaultVisible: true },
+    { id: 'SP_NO',         label: 'SP NO',          defaultVisible: true },
+    { id: 'NAME',          label: 'NAME',           defaultVisible: true },
+    { id: 'PUNCH_IN',      label: 'PUNCH IN',       defaultVisible: true },
+    { id: 'PUNCH_OUT',     label: 'PUNCH OUT',      defaultVisible: true },
+    { id: 'TOTAL_HRS',     label: 'TOTAL HRS',      defaultVisible: true },
+    { id: 'DUTY_HRS',      label: 'DUTY HRS',       defaultVisible: true },
+    { id: 'OT_HRS',        label: 'OT HRS',         defaultVisible: true },
+    { id: 'ADD_LUNCH',     label: 'Allow LUNCH',    defaultVisible: true },
+    { id: 'SHIFTS_ALLOWED',label: 'SHIFTS ALLOWED', defaultVisible: true },
+    { id: 'SHIFT',         label: 'SHIFT',          defaultVisible: true },
+    { id: 'SHIFT_IN',      label: 'SHIFT IN',       defaultVisible: true },
+    { id: 'SHIFT_OUT',     label: 'SHIFT OUT',      defaultVisible: true },
+    { id: 'DUTY_IN',       label: 'DUTY IN',        defaultVisible: true },
+    { id: 'DUTY_OUT',      label: 'DUTY OUT',       defaultVisible: true },
+    { id: 'SKILL',         label: 'SKILL',          defaultVisible: true },
+    { id: 'IN_OT',         label: 'Allow IN-OT',    defaultVisible: true },
+    { id: 'OUT_OT',        label: 'Allow OUT-OT',   defaultVisible: true },
+    { id: 'DESIGNATION',   label: 'DESIGNATION',    defaultVisible: true },
+    { id: 'VENDOR_NAME',   label: 'VENDOR NAME',    defaultVisible: true },
+    { id: 'WORKORDER_NO',  label: 'WORKORDER NO',   defaultVisible: true },
+    { id: 'DEPT_NAME',     label: 'DEPT NAME',      defaultVisible: true },
+    { id: 'SECTION',       label: 'SECTION',        defaultVisible: true }
+];
+
+/** Set of 1-based column-child indices that are currently hidden. */
+let hiddenColumns = new Set();
+
+/**
+ * Injects CSS rules to hide columns whose indices are in `hiddenColumns`.
+ * Only hides columns while the table is in its main (non-aggregate) view.
+ */
+function updateColumnVisibility() {
+    let cssRules = '';
+    hiddenColumns.forEach(childIndex => {
+        cssRules += `#dataTable.main-view th:nth-child(${childIndex}), #dataTable.main-view td:nth-child(${childIndex}) { display: none !important; }\n`;
+    });
+    dynamicStyle.innerHTML = cssRules;
+}
+
+// Build column-picker dropdown
+if (columnPickerDropdown) {
+    const header    = document.createElement('div');
+    header.className = 'column-dropdown-header';
+
+    const checkboxes = [];
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className   = 'column-toggle-btn';
+    toggleBtn.textContent = 'Toggle All';
+    toggleBtn.addEventListener('click', e => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const allSelected = hiddenColumns.size === 0;
+        if (allSelected) {
+            checkboxes.forEach(cb => cb.checked = false);
+            COLUMN_DEFS.forEach((_, i) => hiddenColumns.add(i + 1));
+        } else {
+            checkboxes.forEach(cb => cb.checked = true);
+            hiddenColumns.clear();
+        }
+        updateColumnVisibility();
+    });
+
+    header.appendChild(toggleBtn);
+    columnPickerDropdown.appendChild(header);
+
+    COLUMN_DEFS.forEach((col, index) => {
+        const label    = document.createElement('label');
+        label.className = 'column-dropdown-item';
+
+        const checkbox   = document.createElement('input');
+        checkbox.type    = 'checkbox';
+        checkbox.checked = col.defaultVisible;
+        if (!col.defaultVisible) hiddenColumns.add(index + 1);
+
+        checkbox.addEventListener('change', e => {
+            if (e.target.checked) {
+                hiddenColumns.delete(index + 1);
+            } else {
+                hiddenColumns.add(index + 1);
+            }
+            updateColumnVisibility();
+        });
+
+        checkboxes.push(checkbox);
+        label.appendChild(checkbox);
+        label.appendChild(document.createTextNode(col.label));
+        columnPickerDropdown.appendChild(label);
+    });
+}
+
+// Toggle dropdown open/close
+if (columnPickerBtn) {
+    columnPickerBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const isOpen = !columnPickerDropdown.classList.contains('is-hidden');
+        columnPickerDropdown.classList.toggle('is-hidden', isOpen);
+        columnPickerBtn.setAttribute('aria-expanded', String(!isOpen));
+    });
+}
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+    if (
+        columnPickerBtn &&
+        !columnPickerBtn.contains(e.target) &&
+        !columnPickerDropdown.contains(e.target)
+    ) {
+        columnPickerDropdown.classList.add('is-hidden');
+        columnPickerBtn.setAttribute('aria-expanded', 'false');
+    }
+});
+
+// Apply initial visibility (all visible by default)
+updateColumnVisibility();
+
+// -----------------------------------------------
+// SORT STATE
+// -----------------------------------------------
+
+/** Per-column sort state: 'none' | 'asc' | 'desc' */
+const sortStates = {
+    date:          'asc',
+    name:          'none',
+    skill:         'none',
+    designation:   'none',
+    shiftsAllowed: 'none',
+    shift:         'none'
+};
+
+/**
+ * Cycles a column's sort state (none → asc → desc → none) and re-renders.
+ * @param {string} col - Key of `sortStates` to toggle.
+ */
+function toggleSort(col) {
+    try {
+        if      (sortStates[col] === 'none') sortStates[col] = 'asc';
+        else if (sortStates[col] === 'asc')  sortStates[col] = 'desc';
+        else                                  sortStates[col] = 'none';
+        renderTable();
+    } catch (err) {
+        console.error('toggleSort error:', err);
+    }
+}
+
+/** Back-compat alias used by older inline onclick references. */
+function toggleDateSort() { toggleSort('date'); }
+
+/**
+ * Returns the HTML snippet for up/down sort-arrow indicators for a column.
+ * @param {string} col - Key of `sortStates`.
+ * @returns {string} HTML string.
+ */
+function sortArrowsHtml(col) {
+    return `<span class="sort-arrows" aria-hidden="true">
+        <span class="sort-arrow up ${sortStates[col] === 'asc'  ? 'active' : ''}">▲</span>
+        <span class="sort-arrow down ${sortStates[col] === 'desc' ? 'active' : ''}">▼</span>
+    </span>`;
+}
+
+// -----------------------------------------------
+// REPROCESS (called when addLunch checkbox changes)
+// -----------------------------------------------
+
+/**
+ * Recalculates hours for all rows in `employeeData` using the current addLunch flag,
+ * then re-renders the main table.
+ */
+function reprocessData() {
+    try {
+        const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
+        employeeData.forEach(row => {
+            row.addLunch = addLunch;
+
+            const punch_in   = row.punchIn;
+            const punch_out  = row.punchOut;
+            const employeeId = row.sp_no;
+
+            if (punch_in && punch_out && punch_in !== 'N/A' && punch_out !== 'N/A') {
+                const inOtAllowed  = row.inOT;
+                const outOtAllowed = row.outOT;
+
+                const shiftIn     = row.shiftIn;
+                const shiftOut    = row.shiftOut;
+                const shiftInMins  = shiftIn  ? parseTimeFormatToMinutes(shiftIn)  : null;
+                const shiftOutMins = shiftOut ? parseTimeFormatToMinutes(shiftOut) : null;
+
+                const { dutyInMins, dutyOutMins } = calculateHours(punch_in, punch_out, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
+
+                const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, row.shift, addLunch);
+                const otHours    = calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
+                const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
+
+                row.dutyIn    = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
+                row.dutyOut   = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
+                row.dutyHours = parseFloat(dutyHours.toFixed(2));
+                row.otHours   = parseFloat(otHours.toFixed(2));
+                row.totalHours = totalHours;
+            }
+        });
+
+        renderTable();
+    } catch (err) {
+        console.error('reprocessData error:', err);
+    }
+}
+
+// -----------------------------------------------
+// CLM UPLOAD GATING
+// -----------------------------------------------
+
+/**
+ * Enables or disables the CLM file upload section (Step 2) based on
+ * whether a master file has been uploaded or the bypass checkbox is checked.
+ * Shows a warning banner when uploads are blocked.
+ */
+function updateCLMUploadState() {
+    const warningEl  = document.getElementById('clmUploadWarning');
+    const cardsRow   = document.getElementById('clmUploadCardsRow');
+    const bypassed   = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
+    const canUpload  = masterFileUploaded || bypassed;
+
+    if (warningEl && canUpload) {
+        warningEl.classList.add('is-hidden');
+    }
+    if (cardsRow) {
+        cardsRow.classList.toggle('is-disabled', !canUpload);
+    }
+    // Also disable file inputs to prevent programmatic triggering
+    if (fileInput) fileInput.disabled = !canUpload;
+    if (pipoInput) pipoInput.disabled = !canUpload;
+}
+
+// -----------------------------------------------
+// EVENT LISTENERS
+// -----------------------------------------------
+// Deferred: main.js loads first, so functions from other scripts are not yet defined.
+// window 'load' fires after all scripts have been parsed and executed.
+window.addEventListener('load', () => {
+    fileInput.addEventListener('change', handlePresenteeFileSelect);
+    if (pipoInput)          pipoInput.addEventListener('change',  handlePipoFileSelect);
+    exportBtn.addEventListener('click',  exportToExcel);
+    if (dataTable) {
+        dataTable.addEventListener('click', event => {
+            const button = event.target.closest('[data-sort-key]');
+            if (!button) return;
+            toggleSort(button.dataset.sortKey);
+        });
+    }
+    if (searchInput)        searchInput.addEventListener('input',  renderTable);
+    if (addLunchCheckbox)   addLunchCheckbox.addEventListener('change', reprocessData);
+    if (masterFileBtn && masterFileInput) {
+        masterFileBtn.addEventListener('click', () => masterFileInput.click());
+    }
+    if (masterFileInput) {
+        masterFileInput.addEventListener('change', async (event) => {
+            await handleMasterFileUpload(event);
+            // After master file is processed, unlock CLM uploads
+            updateCLMUploadState();
+        });
+    }
+    if (btnEmployeeTotal)   btnEmployeeTotal.addEventListener('click', employeewiseTotalHours);
+    if (btnSkillTotal)      btnSkillTotal.addEventListener('click', skillwiseTotalHours);
+    if (btnExitAggregate)   btnExitAggregate.addEventListener('click', reprocessData);
+
+    // Bypass checkbox toggles CLM upload availability
+    if (bypassMasterFileCheckbox) {
+        bypassMasterFileCheckbox.addEventListener('change', updateCLMUploadState);
+    }
+
+    // Attempting to click Step 2 area shows warning if Step 1 is not done
+    const cardsRow = document.getElementById('clmUploadCardsRow');
+    if (cardsRow) {
+        cardsRow.addEventListener('click', () => {
+            const bypassed = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
+            const canUpload = masterFileUploaded || bypassed;
+            if (!canUpload) {
+                const warningEl = document.getElementById('clmUploadWarning');
+                if (warningEl) {
+                    warningEl.classList.remove('is-hidden');
+                }
+            }
+        });
+    }
+
+    // Set initial state: CLM uploads blocked until master file or bypass
+    updateCLMUploadState();
+});
+
 
 
 ================================================
-FILE: src/index.html
+FILE: src/masterFileUpload.js
 ================================================
-<!DOCTYPE html>
-<html lang="en">
+// masterFileUpload.js
+// Handles upload and parsing of the Master File (masterEmployeeDetails + SHIFT_DEFINITIONS).
+// On successful parse, populates the shared state declared in main.js.
+// Dependencies: main.js (masterFileUploaded, masterEmployeeDetails, SHIFT_DEFINITIONS),
+//               hoursProcessing.js (parseTimeFormatToMinutes, formatMinutesTo24h)
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Working Hours Calculator</title>
-    <link rel="stylesheet" href="styles.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap"
-        rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-</head>
+// -----------------------------------------------
+// INTERNAL HELPERS
+// -----------------------------------------------
 
-<body>
-    <div class="app-container">
-        <header class="header">
-            <div class="header-content">
-                <div class="logo-group">
-                    <div class="logo-accent"></div>
-                    <h1>Working Hours Calculator</h1>
-                </div>
-                <p>FMM-INFRA, Crane Group</p>
-            </div>
-            <div class="header-actions">
-                <button id="exportBtn" class="btn btn-primary" disabled>
-                    <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round"
-                        stroke-linejoin="round" height="16" width="16" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                        <polyline points="7 10 12 15 17 10"></polyline>
-                        <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
-                    <span>Export XLSX</span>
-                </button>
-            </div>
-        </header>
+/**
+ * Normalises an Excel time value to a clean "HH:MM" string.
+ *
+ * Excel can give us:
+ *   - A fractional day number  (e.g. 0.25 = 06:00)
+ *   - A string like "06:00", "6:00", "06.00", "6.30 AM"
+ *   - An integer serial date (treat same as fractional, e.g. 0)
+ *
+ * Returns "" if the value cannot be resolved.
+ */
+function _excelTimeToHHMM(val) {
+    if (val === null || val === undefined || val === '') return '';
 
-        <main class="main-content">
-            <section class="upload-section">
-                <div class="upload-card">
-                    <div class="upload-icon">
-                        <!-- <svg stroke="currentColor" fill="none" stroke-width="1.5" viewBox="0 0 24 24"
-                            stroke-linecap="round" stroke-linejoin="round" height="42" width="42"
-                            xmlns="http://www.w3.org/2000/svg">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="12" y1="8" x2="12" y2="16"></line>
-                            <line x1="8" y1="12" x2="16" y2="12"></line>
-                        </svg> -->
-                        <svg stroke="currentColor" fill="none" stroke-width="1.5" viewBox="0 0 24 24"
-                            stroke-linecap="round" stroke-linejoin="round" height="42" width="42"
-                            xmlns="http://www.w3.org/2000/svg">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+    // Numeric fractional day (Excel time encoding)
+    if (typeof val === 'number') {
+        // Keep only the fractional part in case a full datetime serial slips through
+        const frac = val % 1;
+        const totalMins = Math.round(frac * 1440);
+        return formatMinutesTo24h(totalMins);
+    }
 
-                            <text x="12" y="12.5" font-family="system-ui, -apple-system, sans-serif" font-size="6"
-                                font-weight="700" text-anchor="middle" dominant-baseline="middle" fill="currentColor"
-                                stroke="none">
-                                CLM
-                            </text>
-                        </svg>
-                    </div>
-                    <h2>Upload CLM Files (XLS)</h2>
-                    <label for="fileInput" class="btn btn-outline">Browse Files</label>
-                    <input type="file" id="fileInput" accept=".xls,.xlsx" multiple hidden>
-                </div>
-            </section>
+    // String — try parseTimeFormatToMinutes (handles HH:MM, HH.MM, h AM/PM, etc.)
+    if (typeof val === 'string') {
+        const mins = parseTimeFormatToMinutes(val.trim());
+        if (mins !== null) return formatMinutesTo24h(mins);
+    }
 
-            <section class="status-section" id="statusSection" style="display: none;">
-                <div class="status-card">
-                    <div class="status-header">
-                        <h3>File Processing</h3>
-                        <span id="fileCountBadge" class="badge">0 files</span>
-                    </div>
-                    <ul id="fileStatusList" class="status-list">
-                    </ul>
-                </div>
-            </section>
+    return String(val).trim(); // last resort – return as-is
+}
 
-            <section class="data-section">
-                <div class="data-controls">
-                    <div class="search-box">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                            class="search-icon">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                        <input type="text" id="searchInput" placeholder="Search by name, pass, vendor, or shift...">
-                    </div>
-                    <label class="stat-button"
-                        style="display: flex; align-items: center; gap: 0.5rem; font-weight: 700; cursor: pointer; white-space: nowrap;">
-                        <input type="checkbox" id="addLunchCheckbox" style="width: 20px; height: 20px;">
-                        Add Lunch
-                    </label>
-                    <button id="btnEmployeeTotal" class="stat-button" onclick="employeewiseTotalHours()"
-                        style="display: none;">Employee Total</button>
-                    <button id="btnSkillTotal" class="stat-button" onclick="skillwiseTotalHours()"
-                        style="display: none;">Skill Total</button>
-                    <button id="btnExitAggregate" class="stat-button" onclick="reprocessData()"
-                        style="display: none; background-color: #fee2e2; color: #b91c1c; border-color: #fca5a5; font-weight: bold;">✕ Close</button>
-                </div>
+/**
+ * Converts a YES/NO/TRUE/FALSE/1/0 cell value to a boolean.
+ */
+function _parseYesNo(val) {
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'number')  return val !== 0;
+    const s = String(val).trim().toLowerCase();
+    return s === 'yes' || s === 'true' || s === '1';
+}
 
-                <div class="table-container">
-                    <table id="dataTable">
-                        <thead>
-                            <tr>
-                                <th>SN</th>
-                                <th>DATE</th>
-                                <th>SP NO</th>
-                                <th class="highlight-header">NAME</th>
-                                <th class="highlight-header">PUNCH IN</th>
-                                <th class="highlight-header">PUNCH OUT</th>
-                                <th class="highlight-header">TOTAL HRS</th>
-                                <th>DUTY HRS</th>
-                                <th>OT HRS</th>
-                                <th>ADD LUNCH</th>
-                                <th>SHIFTS ALLOWED</th>
-                                <th>SHIFT</th>
-                                <th>SHIFT IN</th>
-                                <th>SHIFT OUT</th>
-                                <th>DUTY IN</th>
-                                <th>DUTY OUT</th>
-                                <th>SKILL</th>
-                                <th>IN-OT</th>
-                                <th>OUT-OT</th>
-                                <th>DESIGNATION</th>
-                                <th>VENDOR NAME</th>
-                                <th>WORKORDER NO</th>
-                                <th>DEPT NAME</th>
-                                <th>SECTION</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody">
-                            <tr class="empty-state-row">
-                                <td colspan="24">
-                                    <div class="empty-state">
-                                        <div class="empty-state-icon">
-                                            <svg stroke="currentColor" fill="none" stroke-width="1.5"
-                                                viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"
-                                                height="42" width="42" xmlns="http://www.w3.org/2000/svg">
-                                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                                                <polyline points="2 17 12 22 22 17"></polyline>
-                                                <polyline points="2 12 12 17 22 12"></polyline>
-                                            </svg>
-                                        </div>
-                                        <p>No data available</p>
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </section>
-        </main>
-    </div>
+/**
+ * Parses the "Allowed Shifts" cell, which may be:
+ *   "A, G, C"  |  "A,G,C"  |  "W1"  |  ["W1","B"]
+ * Returns an array of trimmed shift-key strings.
+ */
+function _parseAllowedShifts(val) {
+    if (!val) return [];
+    if (Array.isArray(val)) return val.map(v => String(v).trim()).filter(Boolean);
+    return String(val).split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+}
 
-    <script src="persistent_data.js"></script>
-    <script src="script.js"></script>
-</body>
+// -----------------------------------------------
+// SHEET PARSERS
+// -----------------------------------------------
 
-</html>
+/**
+ * Parses Sheet 1 ("employee_details").
+ * Expected headers (case-insensitive, order-insensitive):
+ *   SP No | Employee Name | Designation | Skill Level | Allowed Shifts | In OT Allowed | Out OT Allowed
+ *
+ * @param {object} worksheet - SheetJS worksheet object
+ * @returns {object[]} Parsed employee_details array
+ */
+function _parseEmployeeDetailsSheet(worksheet) {
+    const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+    // Normalise header keys: lower-case, strip spaces/punctuation for flexible matching
+    const norm = str => String(str).toLowerCase().replace(/[\s_\-\.]/g, '');
+
+    const parsed = [];
+
+    rawRows.forEach((row, rowIdx) => {
+        // Map raw keys to normalised keys once per row
+        const get = targetNorm => {
+            for (const key of Object.keys(row)) {
+                if (norm(key) === targetNorm) return row[key];
+            }
+            return '';
+        };
+
+        const spNo = String(get('spno') || get('safetpassno') || get('safetypassno') || '').trim();
+        if (!spNo) return; // skip blank / header echo rows
+
+        const entry = {
+            sp_no:         spNo,
+            name:          String(get('employeename') || '').trim(),
+            designation:   String(get('designation')  || '').trim().toLowerCase(),
+            skill:         String(get('skilllevel')   || '').trim().toLowerCase(),
+            allowedShifts: _parseAllowedShifts(
+                               get('allowedshifts') || get('allowedshift') || ''
+                           ),
+            inOtAllowed:   _parseYesNo(get('inotallowed')  || get('inot')  || false),
+            outOtAllowed:  _parseYesNo(get('outotallowed') || get('outot') || false)
+        };
+
+        parsed.push(entry);
+        console.log(`[Master] employee_details[${rowIdx}]:`, entry);
+    });
+
+    return parsed;
+}
+
+/**
+ * Parses Sheet 2 ("shift_definitions").
+ * Expected headers (case-insensitive):
+ *   Shift Name | In | Out
+ *
+ * @param {object} worksheet - SheetJS worksheet object
+ * @returns {object} SHIFT_DEFINITIONS map  { shiftKey: { shiftIn, shiftOut }, … }
+ */
+function _parseShiftDefinitionsSheet(worksheet) {
+    const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+    const norm = str => String(str).toLowerCase().replace(/[\s_\-\.]/g, '');
+
+    const defs = {};
+
+    rawRows.forEach((row, rowIdx) => {
+        const get = targetNorm => {
+            for (const key of Object.keys(row)) {
+                if (norm(key) === targetNorm) return row[key];
+            }
+            return '';
+        };
+
+        const shiftName = String(get('shiftname') || get('shift') || get('name') || '').trim();
+        if (!shiftName) return;
+
+        const shiftIn  = _excelTimeToHHMM(get('in')  || get('shiftin')  || '');
+        const shiftOut = _excelTimeToHHMM(get('out') || get('shiftout') || '');
+
+        const entry = { shiftIn, shiftOut };
+        defs[shiftName] = entry;
+        console.log(`[Master] SHIFT_DEFINITIONS["${shiftName}"]:`, entry);
+    });
+
+    return defs;
+}
+
+// -----------------------------------------------
+// MAIN HANDLER
+// -----------------------------------------------
+
+/**
+ * Handles the "Upload Master File" input change event.
+ * Reads the selected XLSX, parses both sheets, logs the results, and replaces
+ * the runtime masterEmployeeDetails and SHIFT_DEFINITIONS in main.js.
+ */
+async function handleMasterFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const masterStatusEl = document.getElementById('masterFileStatus');
+
+    const setStatus = (text, type) => {
+        if (!masterStatusEl) return;
+        masterStatusEl.textContent = text;
+        masterStatusEl.className   = `master-file-badge master-file-badge--${type}`;
+    };
+
+    setStatus('Processing...', 'loading');
+
+    try {
+        const data     = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: 'array', cellDates: false });
+
+        console.groupCollapsed(`[Master File Upload] "${file.name}"`);
+        console.log('Sheets found:', workbook.SheetNames);
+
+        // ---- Sheet 1: employee_details ----
+        const empSheetName = workbook.SheetNames.find(n =>
+            n.toLowerCase().replace(/\s/g, '') === 'employeedetails'
+        ) || workbook.SheetNames[0];
+
+        if (!empSheetName) throw new Error('Could not locate "employee_details" sheet (Sheet 1).');
+
+        console.group(`Sheet 1 → "${empSheetName}" (employee_details)`);
+        const parsedEmployees = _parseEmployeeDetailsSheet(workbook.Sheets[empSheetName]);
+        console.groupEnd();
+
+        // ---- Sheet 2: shift_definitions (optional) ----
+        const shiftSheetName = workbook.SheetNames.find(n =>
+            n.toLowerCase().replace(/\s/g, '') === 'shiftdefinitions'
+        ) || workbook.SheetNames[1];
+
+        let parsedShifts = {};
+        if (shiftSheetName && workbook.Sheets[shiftSheetName]) {
+            console.group(`Sheet 2 → "${shiftSheetName}" (shift_definitions)`);
+            parsedShifts = _parseShiftDefinitionsSheet(workbook.Sheets[shiftSheetName]);
+            console.groupEnd();
+        } else {
+            console.warn('[Master] No shift_definitions sheet found — using defaults.');
+        }
+
+        console.groupEnd(); // Master File Upload
+
+        // ---- Update shared state (declared in main.js) ----
+        masterFileUploaded = true;
+        masterEmployeeDetails = parsedEmployees;
+
+        // Clear and repopulate SHIFT_DEFINITIONS in-place
+        // If the master sheet had shift definitions, use them; otherwise reset to defaults
+        Object.keys(SHIFT_DEFINITIONS).forEach(k => delete SHIFT_DEFINITIONS[k]);
+        if (Object.keys(parsedShifts).length > 0) {
+            Object.assign(SHIFT_DEFINITIONS, parsedShifts);
+        } else {
+            Object.assign(SHIFT_DEFINITIONS, DEFAULT_SHIFT_DEFINITIONS);
+        }
+
+        console.log('[Master] Updated masterEmployeeDetails:', masterEmployeeDetails);
+        console.log('[Master] Updated SHIFT_DEFINITIONS:', SHIFT_DEFINITIONS);
+
+        setStatus(`Loaded: ${file.name}`, 'success');
+
+    } catch (err) {
+        console.error('[Master File Upload] Error:', err);
+        setStatus(`Error: ${err.message}`, 'error');
+    }
+
+    // Reset input so the same file can be re-uploaded if needed
+    event.target.value = '';
+}
+
 
 
 ================================================
@@ -279,76 +1025,43 @@ Drivers Only
 //     'RW0807096365'
 // ];
 
-// const EMPLOYEE_SKILLS = {
-//     'VW0123649596': 'High',
-//     'RW1011186925': 'High',
-//     'RW1019191001': 'High',
-//     'RW0911182377': 'High',
-//     'VW0123657591': 'High',
-//     'RW0305045827': 'High',
-//     'RW0403000921': 'High',
-//     'RD0918134974': 'High',
-//     'RW0807096365': 'High',
-//     'RW0608113053': 'High',
-//     'RD1203000744': 'High',
-//     'VD0722561172': 'High',
-//     'RW0916154862': 'High',
-//     'RD0721287965': 'High',
-//     'RW0218129961': 'Low',
-//     'RW0105038642': 'Low',
-//     'RW0911183405': 'Low',
-//     'RW1103005471': 'Low',
-//     'JW0724246971': 'Low',
-//     'RS0604000979': 'Low',
-//     'RW0822573453': 'Low',
-//     'RW0621276455': 'Low',
-//     'RW0512133959': 'Low',
-//     'RW0623791155': 'Low',
-//     'RW0723808557': 'Low',
-//     'RW0907097796': 'Medium',
-//     'RW1103006020': 'Medium',
-//     'RW0204008111': 'Medium',
-//     'RW1110162302': 'Medium',
-//     'RW1223956402': 'Medium',
-//     'RW0611151520': 'Medium'
-// };
 
-
-const employee_details = [
-    { sp_no: "VW0123649596", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW1011186925", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW1019191001", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0911182377", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "VW0123657591", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0305045827", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0403000921", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RD0918134974", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0807096365", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0608113053", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RD1203000744", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
-    { sp_no: "VD0722561172", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0916154862", designation: "helper", skill: "high", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RD0721287965", designation: "driver", skill: "high", allowedShifts: ['A','G','C'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0218129961", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0105038642", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0911183405", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW1103005471", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "JW0724246971", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RS0604000979", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0822573453", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0621276455", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0512133959", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0623791155", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0723808557", designation: "helper", skill: "low", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0907097796", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW1103006020", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0204008111", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW1110162302", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW1223956402", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} },
-    { sp_no: "RW0611151520", designation: "helper", skill: "medium", allowedShifts: ['W1','A','B'], allowedOT:{in:true,out:true} }
+let employee_details = [
+    { sp_no: "RW0911182377", name: "SUJIT KR. VISHWAKARMA", designation: "driver", skill: "highly skilled", allowedShifts: ['A', 'G', 'C'], inOtAllowed: true, outOtAllowed: true },
+    { sp_no: "RD0721287965", name: "NALIN MAHATO", designation: "driver", skill: "highly skilled", allowedShifts: ['A', 'G', 'C'], inOtAllowed: true, outOtAllowed: true },
+    { sp_no: "RD0918134974", name: "RUPESH KUMAR", designation: "driver", skill: "highly skilled", allowedShifts: ['A', 'G', 'C'], inOtAllowed: true, outOtAllowed: true },
+    { sp_no: "VD0722561172", name: "LAXMAN BHADUK", designation: "driver", skill: "highly skilled", allowedShifts: ['A', 'G', 'C'], inOtAllowed: true, outOtAllowed: true },
+    { sp_no: "RW0305045827", name: "RAJU KALINDI", designation: "driver", skill: "highly skilled", allowedShifts: ['A', 'G', 'C'], inOtAllowed: true, outOtAllowed: true },
+    { sp_no: "RD1203000744", name: "NIPEN CH. SHUKUL", designation: "driver", skill: "highly skilled", allowedShifts: ['A', 'G', 'C'], inOtAllowed: true, outOtAllowed: true },
+    { sp_no: "RW0807096365", name: "CHHOTU LOHRA", designation: "supervisor", skill: "highly skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0916154862", name: "SHIV SHANKAR", designation: "electrician", skill: "highly skilled", allowedShifts: ['W1', 'B'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0403000921", name: "MAN MOHAN", designation: "mechanic", skill: "highly skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0608113053", name: "RAJESH PRADHAN", designation: "rigger", skill: "highly skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW1011186925", name: "ANIL VERMA", designation: "rigger", skill: "highly skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW1019191001", name: "CHITRANJAN SHARMA", designation: "fitter", skill: "highly skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW1110162302", name: "CHITRANJAN MAHATO", designation: "welder/gas cutter", skill: "skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0907097796", name: "ASHOK ROY (Electrician)", designation: "electrician", skill: "skilled", allowedShifts: ['W1', 'B'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW1103006020", name: "B N MAHAPATRO", designation: "attender", skill: "skilled", allowedShifts: ['A', 'B', 'C'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0611151520", name: "V RAJA RAO", designation: "helper", skill: "skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW1204027584", name: "BALWINDER SINGH", designation: "rigger", skill: "skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "VW0123649596", name: "ABHISHEK BIRULI ( FITTER)", designation: "fitter", skill: "skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "VW0123657591", name: "HINDU BESRA ( FITTER )", designation: "fitter", skill: "skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW1223956402", name: "KARAN KUMAR ( STORE)", designation: "helper", skill: "skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW1103005471", name: "NASIR ALI", designation: "helper", skill: "semi skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0512133959", name: "SUJIT KUMAR SINGH", designation: "helper", skill: "semi skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0218129961", name: "APURBA KR MAHATO", designation: "helper", skill: "semi skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "JW0724246971", name: "NAVEEN KUMAR", designation: "helper", skill: "semi skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0621276455", name: "SUBHANDU MANDAL", designation: "helper", skill: "semi skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0822573453", name: "RATAN MAHATO", designation: "helper", skill: "semi skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0105038642", name: "NANDLAL TIU", designation: "helper", skill: "semi skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RS0604000979", name: "RAKESH RK SINGH", designation: "helper", skill: "semi skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0723808557", name: "VISHAL HANSDA", designation: "helper", skill: "semi skilled", allowedShifts: ['W1'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0623791155", name: "TATA VENKAT RAO", designation: "attender", skill: "semi skilled", allowedShifts: ['A', 'B', 'C'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0204008111", name: "BASUDEO", designation: "attender", skill: "semi skilled", allowedShifts: ['A', 'B', 'C'], inOtAllowed: false, outOtAllowed: true },
+    { sp_no: "RW0911183405", name: "NARAYAN RAO", designation: "attender", skill: "semi skilled", allowedShifts: ['A', 'B', 'C'], inOtAllowed: false, outOtAllowed: true }
 ];
 
-const SHIFT_DEFINITIONS = {
+let DEFAULT_SHIFT_DEFINITIONS = {
     'A': { shiftIn: '06:00', shiftOut: '14:00' },
     'B': { shiftIn: '14:00', shiftOut: '22:00' },
     'C': { shiftIn: '22:00', shiftOut: '06:00' },
@@ -389,600 +1102,86 @@ let employeeData = [
 */
 
 
+
 ================================================
-FILE: src/script.js
+FILE: src/renderTable.js
 ================================================
-// Core Application Logic for Working Hours Calculator
-
-const fileInput = document.getElementById('fileInput');
-const statusSection = document.getElementById('statusSection');
-const fileStatusList = document.getElementById('fileStatusList');
-const fileCountBadge = document.getElementById('fileCountBadge');
-const dataTable = document.getElementById('dataTable');
-const tableBody = document.getElementById('tableBody');
-const exportBtn = document.getElementById('exportBtn');
-const searchInput = document.getElementById('searchInput');
-const addLunchCheckbox = document.getElementById('addLunchCheckbox');
-
-let employeeData = [];
-let dateSortOrder = 'none'; // 'none' | 'asc' | 'desc'
-
-// Listen for file selections
-fileInput.addEventListener('change', handleFileSelect);
-exportBtn.addEventListener('click', exportToExcel);
-if (searchInput) searchInput.addEventListener('input', renderTable);
-if (addLunchCheckbox) addLunchCheckbox.addEventListener('change', reprocessData);
-
-//data structure blueprint for employess
-/*
-let employeeData = [
-    {
-        date: from Uploaded file
-        sp_no: from Uploaded file
-        name: from Uploaded file
-        vendor_name: from Uploaded file
-        workorder_no: from Uploaded file
-        dept_name: from Uploaded file
-        section: from Uploaded file
-        skill: from persistent_data
-        designation: from persistent_data   
-        shiftsAllowed[]: from persistent_data
-        shift: after assignShift()
-        shiftIn: after assignShift()
-        shiftOut: after assignShift()
-        punchIn: from Uploaded file
-        punchOut: from Uploaded file
-        dutyIn: after calculateHours()
-        dutyOut: after calculateHours()
-        addLunch: from addLunch button/flag
-        dutyHours: from calculateHours()
-        otHours: from calculateHours()
-        totalHours: from calculateHours()        
-    }
-]
-*/
-//----------------------------------------
-
-
-//FILE INPUT & INGEST FUNCTIONS
-//file upload
-async function handleFileSelect(event) {
-    try {
-        const files = Array.from(event.target.files);
-        if (!files.length) return;
-
-        statusSection.style.display = 'block';
-
-        // Clear previous list if running again? Or append? Let's clear for new batch.
-        fileStatusList.innerHTML = '';
-        employeeData = [];
-        tableBody.innerHTML = ''; // clear table
-
-        fileCountBadge.textContent = `${files.length} File${files.length > 1 ? 's' : ''}`;
-
-        for (const file of files) {
-            await processFile(file);
-        }
-
-        // Render the processed data
-        renderTable();
-
-        if (employeeData.length > 0) {
-            exportBtn.disabled = false;
-
-            const btnEmployeeTotal = document.getElementById('btnEmployeeTotal');
-            const btnSkillTotal = document.getElementById('btnSkillTotal');
-            if (btnEmployeeTotal) btnEmployeeTotal.style.display = 'block';
-            if (btnSkillTotal) btnSkillTotal.style.display = 'block';
-        }
-
-    } catch (err) {
-        console.error('handleFileSelect error:', err);
-    }
-}
-
-//file processing
-async function processFile(file) {
-    const statusItem = document.createElement('li');
-    statusItem.className = 'status-item';
-    statusItem.innerHTML = `
-        <span class="file-name">${file.name}</span>
-        <span class="status-text">Processing...</span>
-    `;
-    fileStatusList.appendChild(statusItem);
-
-    try {
-        const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: 'array' });
-
-        // Assuming first sheet holds the data
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-
-        // Convert sheet to array of arrays to find metadata and headers
-        const rawJsonArray = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
-
-        // 1. Extract Date from Cell B3
-        // In array of arrays, Cell B3 is row index 2, col index 1 (assuming 0-indexed)
-        // Let's search entire first 10 rows just to be safe, but primarily check B3.
-        let rawDateStr = '';
-        const b3Val = worksheet['B3'] ? worksheet['B3'].v : '';
-        if (b3Val) {
-            // Regex to find "Date : <VALUE>"
-            const dateMatch = b3Val.toString().match(/Date\s*:\s*(.+)/i);
-            if (dateMatch) {
-                rawDateStr = dateMatch[1].trim();
-            }
-        }
-
-        // Fallback: search first 10 rows for "Date :"
-        if (!rawDateStr) {
-            for (let i = 0; i < Math.min(10, rawJsonArray.length); i++) {
-                const rowString = rawJsonArray[i].join(' ');
-                const fallbackMatch = rowString.match(/Date\s*:\s*(.+)/i);
-                if (fallbackMatch) {
-                    rawDateStr = fallbackMatch[1].trim();
-                    break;
-                }
-            }
-        }
-
-        const normalizedDate = normalizeDate(rawDateStr);
-
-        // 2. Programmatically find the header row
-        let headerRowIndex = -1;
-        for (let i = 0; i < rawJsonArray.length; i++) {
-            const row = rawJsonArray[i];
-            const rowStr = row.join('').toLowerCase().replace(/\s+/g, '').replace(/-/g, '');
-            // Look for columns we know exist
-            if (rowStr.includes('safetypassno') || rowStr.includes('employeename') || rowStr.includes('intime')) {
-                headerRowIndex = i;
-                break;
-            }
-        }
-
-        if (headerRowIndex === -1) {
-            throw new Error('Could not cleanly identify the header row in this file.');
-        }
-
-        // 3. Extract the tabular records using the found header row
-        const dataRows = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex, defval: '' });
-
-        // 4. Process each row
-        const processedRows = dataRows
-            .filter(row => {
-                const empName = row['Employee Name'] ? String(row['Employee Name']).trim() : '';
-                let empId = row['Safety Pass No'] ? String(row['Safety Pass No']).trim() : '';
-                if (!empName || !empId) return false;
-
-                return true;
-            })
-            .map((row, index) => {
-                const inTimeRaw = String(row['In Time'] || row['In-Time'] || '').trim();
-                const outTimeRaw = String(row['Out Time'] || row['Out-Time'] || '').trim();
-
-                const inMins = parseTimeFormatToMinutes(inTimeRaw);
-                const outMins = parseTimeFormatToMinutes(outTimeRaw);
-
-                const inTime = inMins !== null ? formatMinutesTo24h(inMins) : inTimeRaw;
-                const outTime = outMins !== null ? formatMinutesTo24h(outMins) : outTimeRaw;
-
-                // Shift data is no longer extracted from the file; custom calculation will answer this later
-                let shift = '';
-                const employeeId = String(row['Safety Pass No'] || '').trim();
-
-                shift = assignShift(employeeId, inTime, outTime);
-
-                let shiftIn = '';
-                let shiftOut = '';
-                if (shift && SHIFT_DEFINITIONS[shift]) {
-                    shiftIn = SHIFT_DEFINITIONS[shift].shiftIn;
-                    shiftOut = SHIFT_DEFINITIONS[shift].shiftOut;
-                }
-
-                const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
-                const calc = calculateHours(inTime, outTime, shift, shiftIn, shiftOut, addLunch, employeeId);
-
-                const formattedDutyIn = calc.dutyInMins !== null ? formatMinutesTo24h(calc.dutyInMins) : '';
-                const formattedDutyOut = calc.dutyOutMins !== null ? formatMinutesTo24h(calc.dutyOutMins) : '';
-
-                let skillVal = null;
-                let designationVal = null;
-                let shiftsAllowedVal = null;
-                let inOTVal = false;
-                let outOTVal = false;
-
-                if (typeof employee_details !== 'undefined') {
-                    const empDetails = employee_details.find(e => e.sp_no === employeeId);
-                    if (empDetails) {
-                        skillVal = empDetails.skill || null;
-                        designationVal = empDetails.designation || null;
-                        shiftsAllowedVal = empDetails.allowedShifts || null;
-                        if (empDetails.allowedOT) {
-                            inOTVal = empDetails.allowedOT.in;
-                            outOTVal = empDetails.allowedOT.out;
-                        }
-                    }
-                }
-
-                return {
-                    date: normalizedDate,
-                    sp_no: employeeId,
-                    name: row['Employee Name'] || '',
-                    vendor_name: row['Vendor Name'] || '',
-                    workorder_no: row['Workorder No'] || '',
-                    dept_name: row['Department Name'] || '',
-                    section: row['Section'] || '',
-                    skill: skillVal,
-                    inOT: inOTVal,
-                    outOT: outOTVal,
-                    designation: designationVal,
-                    shiftsAllowed: shiftsAllowedVal,
-                    shift: shift,
-                    shiftIn: shiftIn,
-                    shiftOut: shiftOut,
-                    punchIn: inTime,
-                    punchOut: outTime,
-                    dutyIn: formattedDutyIn,
-                    dutyOut: formattedDutyOut,
-                    addLunch: addLunch,
-                    dutyHours: calc.dutyHours,
-                    otHours: calc.otHours,
-                    totalHours: calc.netHours
-                };
-            });
-
-        // Append to master list
-        employeeData = employeeData.concat(processedRows);
-
-        statusItem.classList.add('success');
-        statusItem.querySelector('.status-text').textContent = 'Success';
-
-    } catch (err) {
-        console.error('processFile error:', err);
-        statusItem.classList.add('error');
-        statusItem.querySelector('.status-text').textContent = 'Failed';
-    }
-}
-//----------------------------------------
-
-//DATA PROCESSING (MAIN) FUNCTIONS
-//hours calc fn for duty-hours, ot-hours, net-hours by assigning duty-in and duty-out
-function calculateHours(inTimeStr, outTimeStr, shiftStr, shiftInStr, shiftOutStr, addLunch, employeeId) {
-    try {
-        if (!inTimeStr || !outTimeStr || String(inTimeStr).toLowerCase() === 'off' || String(outTimeStr).toLowerCase() === 'off') {
-            return { dutyInMins: null, dutyOutMins: null, netHours: 0, otHours: 0, dutyHours: 0 };
-        }
-
-        const inMins = parseTimeFormatToMinutes(inTimeStr);
-        const outMins = parseTimeFormatToMinutes(outTimeStr);
-        const shiftInMins = shiftInStr ? parseTimeFormatToMinutes(shiftInStr) : null;
-        const shiftOutMins = shiftOutStr ? parseTimeFormatToMinutes(shiftOutStr) : null;
-
-        if (inMins === null || outMins === null) {
-            return { dutyInMins: null, dutyOutMins: null, netHours: 0, otHours: 0, dutyHours: 0 };
-        }
-
-        let allowedOtIn = false;
-        let allowedOtOut = false;
-        
-        if (typeof employee_details !== 'undefined' && employeeId) {
-            const empDetails = employee_details.find(e => e.sp_no === employeeId);
-            if (empDetails && empDetails.allowedOT) {
-                allowedOtIn = empDetails.allowedOT.in;
-                allowedOtOut = empDetails.allowedOT.out;
-            }
-        }
-
-        let dutyInMins = inMins;
-        let dutyOutMins = outMins;
-
-        // IN TIME LOGIC
-        if (shiftInMins !== null) {
-            let nInMins = inMins;
-            // Handle cross-day discrepancy (e.g. shift starts 22:00, punched at 01:00)
-            if (inMins < shiftInMins - 720) nInMins += 1440;
-            else if (inMins > shiftInMins + 720) nInMins -= 1440;
-
-            if (nInMins > shiftInMins + 15) {
-                // Late Check-In: Round UP to nearest 30 mins (Penalty)
-                let r = Math.ceil(nInMins / 30) * 30;
-                dutyInMins = (r % 1440 + 1440) % 1440;
-            } else if (allowedOtIn && (shiftInMins - nInMins > 59)) {
-                // Early OT: Round UP to nearest 30 mins (Reward)
-                let r = Math.ceil(nInMins / 30) * 30;
-                dutyInMins = (r % 1440 + 1440) % 1440;
-            } else {
-                // Normal / Grace period
-                dutyInMins = shiftInMins;
-            }
-        }
-
-        // OUT TIME LOGIC
-        if (shiftOutMins !== null && shiftInMins !== null) {
-            let nOutMins = outMins;
-            if (outMins < inMins) nOutMins += 1440;
-
-            let nShiftOut = shiftOutMins;
-            if (shiftOutMins < shiftInMins) nShiftOut += 1440;
-
-            if (nOutMins < nShiftOut) {
-                // Early Leaver: Round DOWN to nearest 30 mins (Penalty)
-                let r = Math.floor(nOutMins / 30) * 30;
-                dutyOutMins = (r % 1440 + 1440) % 1440;
-            } else if (allowedOtOut) {
-                // OT Out: Round DOWN to nearest 30 mins (Reward)
-                let r = Math.floor(nOutMins / 30) * 30;
-                dutyOutMins = (r % 1440 + 1440) % 1440;
-            } else {
-                // Normal departure (no OT)
-                dutyOutMins = shiftOutMins;
-            }
-        } else if (shiftOutMins !== null) {
-            dutyOutMins = shiftOutMins;
-        }
-
-        // Calculate Difference
-        let diffMins = dutyOutMins - dutyInMins;
-        if (dutyOutMins < dutyInMins) {
-            diffMins += 1440;
-        } else if (diffMins < 0) {
-            diffMins = 0;
-        }
-
-        let totalHours = diffMins / 60;
-
-        if (!addLunch && (shiftStr === 'G' || shiftStr === 'W1')) {
-            totalHours = Math.max(0, totalHours - 1);
-        }
-
-        let rawOtHours = totalHours > 8 ? totalHours - 8 : 0;
-        let otHours = Math.floor(rawOtHours * 2) / 2;
-        let dutyHours = Math.min(8, totalHours);
-        let netHours = dutyHours + otHours;
-
-        if (diffMins < 30) {
-            netHours = 0;
-            otHours = 0;
-            dutyHours = 0;
-        }
-
-        return {
-            dutyInMins,
-            dutyOutMins,
-            netHours: parseFloat(netHours.toFixed(2)),
-            otHours: parseFloat(otHours.toFixed(2)),
-            dutyHours: parseFloat(dutyHours.toFixed(2))
-        };
-    } catch (err) {
-        console.error('calculateHours error:', err);
-        return { dutyInMins: null, dutyOutMins: null, netHours: 0, otHours: 0, dutyHours: 0 };
-    }
-}
-
-//reload data on page refresh
-function reprocessData() {
-    try {
-        const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
-        employeeData.forEach(row => {
-            row.addLunch = addLunch; // update the stored value so the table reflects it
-
-            const inTime = row.punchIn;
-            const outTime = row.punchOut;
-            const shift = row.shift;
-            const shiftIn = row.shiftIn;
-            const shiftOut = row.shiftOut;
-            const employeeId = row.sp_no;
-
-            if (inTime && outTime && inTime !== 'N/A' && outTime !== 'N/A') {
-                const calc = calculateHours(inTime, outTime, shift, shiftIn, shiftOut, addLunch, employeeId);
-                row.dutyHours = calc.dutyHours;
-                row.otHours = calc.otHours;
-                row.totalHours = calc.netHours;
-            }
-        });
-        renderTable();
-    } catch (err) {
-        console.error('reprocessData error:', err);
-    }
-}
-
-// Assigns the correct shift by finding the nearest shiftIn to punchIn.
-// punchIn should lie between shiftIn-120mins and shiftIn+120mins(?)
-function assignShift(employeeId, punchIn, punchOut) {
-    try {
-        // Get allowed shifts for this employee from employee_details
-        const empDetails = (typeof employee_details !== 'undefined')
-            ? employee_details.find(e => e.sp_no === employeeId)
-            : null;
-
-        const allowedShifts = empDetails?.allowedShifts;
-
-        // If no employee details or no allowed shifts, fall back to all defined shifts
-        const shiftsToCheck = (allowedShifts && allowedShifts.length > 0)
-            ? allowedShifts
-            : Object.keys(SHIFT_DEFINITIONS);
-
-        const punchInMins = punchIn ? parseTimeFormatToMinutes(punchIn) : null;
-        const punchOutMins = punchOut ? parseTimeFormatToMinutes(punchOut) : null;
-
-        let bestShift = 'NA';
-        let bestDiff = Infinity;
-
-        // Primary: match punchIn against each shift's shiftIn within ±120 mins
-        if (punchInMins !== null) {
-            shiftsToCheck.forEach(shiftKey => {
-                const def = SHIFT_DEFINITIONS[shiftKey];
-                if (!def) return;
-                const shiftInMins = parseTimeFormatToMinutes(def.shiftIn);
-                if (shiftInMins === null) return;
-
-                // Calculate absolute difference, accounting for midnight wrap
-                let diff = Math.abs(punchInMins - shiftInMins);
-                if (diff > 720) diff = 1440 - diff; // handle midnight crossing
-
-                if (diff <= 120 && diff < bestDiff) {
-                    bestDiff = diff;
-                    bestShift = shiftKey;
-                }
-            });
-        }
-
-        // Fallback: if no match on punchIn, try punchOut against shiftOut
-        if (bestShift === 'NA' && punchOutMins !== null) {
-            bestDiff = Infinity;
-            shiftsToCheck.forEach(shiftKey => {
-                const def = SHIFT_DEFINITIONS[shiftKey];
-                if (!def) return;
-                const shiftOutMins = parseTimeFormatToMinutes(def.shiftOut);
-                if (shiftOutMins === null) return;
-
-                let diff = Math.abs(punchOutMins - shiftOutMins);
-                if (diff > 720) diff = 1440 - diff;
-
-                if (diff <= 120 && diff < bestDiff) {
-                    bestDiff = diff;
-                    bestShift = shiftKey;
-                }
-            });
-        }
-
-        console.log(`assignShift: ${employeeId} → punchIn=${punchIn}, punchOut=${punchOut}, assigned=${bestShift}`);
-        return bestShift;
-    } catch (err) {
-        console.error('assignShift error:', err);
-        return 'NA';
-    }
-}
-//----------------------------------------
-
-//DATE, TIME NORMALISATION FUNCTIONS
-// Converts standard "hh:mm AM/PM" format to minutes since midnight
-function parseTimeFormatToMinutes(timeStr) {
-    try {
-        const timeMatch = String(timeStr).trim().match(/^(\d{1,2})[.:]?(\d{2})?\s*([aApP][mM])?$/);
-        if (!timeMatch) return null;
-
-        let hours = parseInt(timeMatch[1], 10);
-        const mins = parseInt(timeMatch[2] || '0', 10);
-        const period = timeMatch[3] ? timeMatch[3].toUpperCase() : null;
-
-        if (period === 'PM' && hours < 12) hours += 12;
-        if (period === 'AM' && hours === 12) hours = 0;
-
-        return hours * 60 + mins;
-    } catch (err) {
-        console.error('parseTimeFormatToMinutes error:', err);
-        return null;
-    }
-}
-
-// Formats minutes since midnight to "HH:mm" (24h format)
-function formatMinutesTo24h(totalMinutes) {
-    try {
-        const hours = Math.floor(totalMinutes / 60);
-        const mins = totalMinutes % 60;
-        return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-    } catch (err) {
-        console.error('formatMinutesTo24h error:', err);
-        return '';
-    }
-}
-
-// Date normalization function 
-function normalizeDate(dateStr) {
-    try {
-        if (!dateStr) return 'N/A';
-
-        // Just a basic cleanup for now, it's already extracted.
-        // Replace slashes with dashes, trim spaces.
-        let clean = dateStr.replace(/\//g, '-').trim();
-
-        // Remove extra trailing words from extraction edge cases?
-        // the regex .match(/Date\s*:\s*(.*)/) could capture garbage.
-        const strictMatch = clean.match(/(\d{1,2}[-\s/]\d{1,2}[-\s/]\d{2,4})/);
-        if (strictMatch) {
-            clean = strictMatch[1].replace(/\s+/g, '-'); // replace spaces with dashes
-        }
-
-        return clean;
-    } catch (err) {
-        console.error('normalizeDate error:', err);
-        return 'N/A';
-    }
-}
-//----------------------------------------
-
-// Parses date string (dd-mm-yyyy or dd/mm/yyyy) into a sortable timestamp
-function parseSortableDate(dateStr) {
-    try {
-        if (!dateStr || dateStr === 'N/A') return 0;
-        const parts = dateStr.split(/[-\/]/);
-        if (parts.length === 3) {
-            const day = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1;
-            const year = parseInt(parts[2], 10);
-            return new Date(year, month, day).getTime();
-        }
-        return 0;
-    } catch (err) {
-        console.error('parseSortableDate error:', err);
-        return 0;
-    }
-}
-//----------------------------------------
-
-//OP FNS
-// Sorting Date
-function toggleDateSort() {
-    try {
-        if (dateSortOrder === 'none') dateSortOrder = 'asc';
-        else if (dateSortOrder === 'asc') dateSortOrder = 'desc';
-        else dateSortOrder = 'none';
-        renderTable();
-    } catch (err) {
-        console.error('toggleDateSort error:', err);
-    }
-}
-
-// Render table functions
+// renderTable.js
+// Table rendering, aggregate view, and Excel export functions.
+// Dependencies: hoursProcessing.js (parseSortableDate), main.js (employeeData, DOM refs, sortStates)
+
+// -----------------------------------------------
+// MAIN TABLE RENDER
+// -----------------------------------------------
+
+/**
+ * Renders (or re-renders) the main employee-data table.
+ * Applies the active search filter and all active column sorts before painting rows.
+ */
 function renderTable() {
     try {
+        if (dataTable) dataTable.classList.add('main-view');
         const btnExit = document.getElementById('btnExitAggregate');
-        if (btnExit) btnExit.style.display = 'none';
+        if (btnExit) btnExit.classList.add('is-hidden');
 
-        if (employeeData.length === 0) return;
+        const tableContainer = document.getElementById('tableContainer');
+        if (employeeData.length === 0) {
+            if (tableContainer) tableContainer.classList.add('is-hidden');
+            return;
+        }
 
+        // Show the table container now that we have data
+        if (tableContainer) tableContainer.classList.remove('is-hidden');
+
+        // Build sortable column headers
         const thead = document.querySelector('#dataTable thead');
         if (thead) {
             thead.innerHTML = `
                 <tr>
                     <th>SN</th>
-                    <th class="sortable-header" onclick="toggleDateSort()">
-                        DATE
-                        <span class="sort-arrows">
-                            <span class="sort-arrow up ${dateSortOrder === 'asc' ? 'active' : ''}">▲</span>
-                            <span class="sort-arrow down ${dateSortOrder === 'desc' ? 'active' : ''}">▼</span>
-                        </span>
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="date" aria-label="Sort by date">
+                            DATE ${sortArrowsHtml('date')}
+                        </button>
                     </th>
                     <th>SP NO</th>
-                    <th>NAME</th>
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="name" aria-label="Sort by employee name">
+                            NAME ${sortArrowsHtml('name')}
+                        </button>
+                    </th>
                     <th>PUNCH IN</th>
                     <th>PUNCH OUT</th>
                     <th class="highlight-header">TOTAL HRS</th>
                     <th>DUTY HRS</th>
                     <th>OT HRS</th>
                     <th>ADD LUNCH</th>
-                    <th>SHIFTS ALLOWED</th>
-                    <th>SHIFT</th>
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="shiftsAllowed" aria-label="Sort by allowed shifts">
+                            SHIFTS ALLOWED ${sortArrowsHtml('shiftsAllowed')}
+                        </button>
+                    </th>
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="shift" aria-label="Sort by assigned shift">
+                            SHIFT ${sortArrowsHtml('shift')}
+                        </button>
+                    </th>
                     <th>SHIFT IN</th>
                     <th>SHIFT OUT</th>
                     <th>DUTY IN</th>
                     <th>DUTY OUT</th>
-                    <th>SKILL</th>
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="skill" aria-label="Sort by skill">
+                            SKILL ${sortArrowsHtml('skill')}
+                        </button>
+                    </th>
                     <th>IN-OT</th>
                     <th>OUT-OT</th>
-                    <th>DESIGNATION</th>
+                    <th class="sortable-header">
+                        <button class="sort-header-button" type="button" data-sort-key="designation" aria-label="Sort by designation">
+                            DESIGNATION ${sortArrowsHtml('designation')}
+                        </button>
+                    </th>
                     <th>VENDOR NAME</th>
                     <th>WORKORDER NO</th>
                     <th>DEPT NAME</th>
@@ -991,7 +1190,7 @@ function renderTable() {
             `;
         }
 
-        tableBody.innerHTML = ''; // clear empty state
+        tableBody.innerHTML = '';
 
         const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
@@ -1001,14 +1200,32 @@ function renderTable() {
             return searchStr.includes(query);
         });
 
-        // Sort filtered data by date if sort is active
-        if (dateSortOrder !== 'none') {
+        // Apply active column sorts (stable sort: last toggled wins)
+        const strCompare = (va, vb, order) => {
+            const sa = String(va || '').toLowerCase();
+            const sb = String(vb || '').toLowerCase();
+            const cmp = sa.localeCompare(sb);
+            return order === 'asc' ? cmp : -cmp;
+        };
+
+        if (sortStates.date !== 'none') {
             filteredData.sort((a, b) => {
                 const dateA = parseSortableDate(a.date);
                 const dateB = parseSortableDate(b.date);
-                return dateSortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+                return sortStates.date === 'asc' ? dateA - dateB : dateB - dateA;
             });
         }
+        if (sortStates.name !== 'none') filteredData.sort((a, b) => strCompare(a.name, b.name, sortStates.name));
+        if (sortStates.skill !== 'none') filteredData.sort((a, b) => strCompare(a.skill, b.skill, sortStates.skill));
+        if (sortStates.designation !== 'none') filteredData.sort((a, b) => strCompare(a.designation, b.designation, sortStates.designation));
+        if (sortStates.shiftsAllowed !== 'none') {
+            filteredData.sort((a, b) => strCompare(
+                (a.shiftsAllowed || []).join(','),
+                (b.shiftsAllowed || []).join(','),
+                sortStates.shiftsAllowed
+            ));
+        }
+        if (sortStates.shift !== 'none') filteredData.sort((a, b) => strCompare(a.shift, b.shift, sortStates.shift));
 
         if (filteredData.length === 0) {
             tableBody.innerHTML = `
@@ -1023,34 +1240,34 @@ function renderTable() {
             return;
         }
 
-        // Render filtered rows
         filteredData.forEach((row, index) => {
             const tr = document.createElement('tr');
+            const isUnexpectedShift = row.shiftsAllowed && !row.shiftsAllowed.includes(row.shift);
             tr.innerHTML = `
                 <td>${index + 1}</td>
-                <td>${row.date || ''}</td>
-                <td>${row.sp_no || ''}</td>
-                <td>${row.name || ''}</td>
-                <td>${row.punchIn || ''}</td>
-                <td>${row.punchOut || ''}</td>
-                <td class="highlight-hours">${row.totalHours ?? ''}</td>
-                <td>${row.dutyHours ?? ''}</td>
-                <td>${row.otHours ?? ''}</td>
-                <td>${row.addLunch ? 'Yes' : 'No'}</td>
-                <td>${(row.shiftsAllowed || []).join(', ') || ''}</td>
-                <td>${row.shift || ''}</td>
-                <td>${row.shiftIn || ''}</td>
-                <td>${row.shiftOut || ''}</td>
-                <td>${row.dutyIn || ''}</td>
-                <td>${row.dutyOut || ''}</td>
-                <td>${row.skill || ''}</td>
-                <td>${row.inOT ? 'Yes' : 'No'}</td>
-                <td>${row.outOT ? 'Yes' : 'No'}</td>
-                <td>${row.designation || ''}</td>
-                <td>${row.vendor_name || ''}</td>
-                <td>${row.workorder_no || ''}</td>
-                <td>${row.dept_name || ''}</td>
-                <td>${row.section || ''}</td>
+                <td title="date">${row.date || ''}</td>
+                <td title="sp-no">${row.sp_no || ''}</td>
+                <td title="name">${row.name || ''}</td>
+                <td title="punch-in">${row.punchIn || ''}</td>
+                <td title="${row.punchOutNextDate ? 'Punch-out on: ' + row.punchOutNextDate : 'punch-out'}" class="${row.punchOutNextDate ? 'next-day-out' : ''}">${row.punchOut || ''}${row.punchOutNextDate ? '<sup class="next-day-badge">+1</sup>' : ''}</td>
+                <td title="total-hrs" class="highlight-hours">${row.totalHours ?? ''}</td>
+                <td title="duty-hrs">${row.dutyHours ?? ''}</td>
+                <td title="ot-hrs">${row.otHours ?? ''}</td>
+                <td title="add-lunch">${row.addLunch ? 'Yes' : 'No'}</td>
+                <td title="shifts-allowed">${(row.shiftsAllowed || []).join(', ') || ''}</td>
+                <td title="${isUnexpectedShift ? 'Assigned shift is not in allowed shifts' : 'shift'}" class="${isUnexpectedShift ? 'flagged-shift' : ''}">${row.shift || ''}</td>
+                <td title="shift-in">${row.shiftIn || ''}</td>
+                <td title="shift-out">${row.shiftOut || ''}</td>
+                <td title="duty-in">${row.dutyIn || ''}</td>
+                <td title="duty-out">${row.dutyOut || ''}</td>
+                <td title="skill">${row.skill || ''}</td>
+                <td title="in-ot">${row.inOT ? 'Yes' : 'No'}</td>
+                <td title="out-ot">${row.outOT ? 'Yes' : 'No'}</td>
+                <td title="${('designation: ' + row.designation) || 'designation N/A'}">${row.designation || ''}</td>
+                <td title="vendor-name">${row.vendor_name || ''}</td>
+                <td title="workorder-no">${row.workorder_no || ''}</td>
+                <td title="dept-name">${row.dept_name || ''}</td>
+                <td title="section">${row.section || ''}</td>
             `;
             tableBody.appendChild(tr);
         });
@@ -1059,8 +1276,18 @@ function renderTable() {
     }
 }
 
+// -----------------------------------------------
+// AGGREGATED VIEW RENDERER
+// -----------------------------------------------
+
+/**
+ * Renders a generic aggregated data table (replaces the main table view).
+ * @param {object[]} data    - Array of row objects with keys matching `columns`.
+ * @param {string[]} columns - Ordered list of column names to display.
+ */
 function renderAggregatedTable(data, columns) {
     try {
+        if (dataTable) dataTable.classList.remove('main-view');
         const thead = document.querySelector('#dataTable thead');
         const tbody = document.getElementById('tableBody');
 
@@ -1095,9 +1322,15 @@ function renderAggregatedTable(data, columns) {
         console.error('renderAggregatedTable error:', err);
     }
 }
-//----------------------------------------
 
-// AGGREGATE FNS
+// -----------------------------------------------
+// AGGREGATE CALCULATION FUNCTIONS
+// -----------------------------------------------
+
+/**
+ * Returns employee-wise aggregated total hours and shift counts.
+ * @returns {object[]}
+ */
 function getEmployeeAggregatedData() {
     try {
         if (employeeData.length === 0) return [];
@@ -1105,17 +1338,14 @@ function getEmployeeAggregatedData() {
         const aggregated = {};
         employeeData.forEach(row => {
             let empId = row.sp_no;
-            const name = row.name;
-            // Ignore rows without employee ID
             if (!empId) return;
-
             empId = String(empId).trim();
 
-            const key = `${empId}|${name}`;
+            const key = `${empId}|${row.name}`;
             if (!aggregated[key]) {
                 aggregated[key] = {
                     'Safety Pass No': empId,
-                    'Employee Name': name,
+                    'Employee Name': row.name,
                     'Total Hours': 0
                 };
             }
@@ -1123,7 +1353,7 @@ function getEmployeeAggregatedData() {
         });
 
         return Object.values(aggregated).map((item, index) => ({
-            'SN': index + 1,
+            'SL.NO.': index + 1,
             'Safety Pass No': item['Safety Pass No'],
             'Employee Name': item['Employee Name'],
             'Total Hours': parseFloat(item['Total Hours'].toFixed(2)),
@@ -1135,68 +1365,70 @@ function getEmployeeAggregatedData() {
     }
 }
 
+/**
+ * Returns skill-wise aggregated total hours and shift counts.
+ * @returns {object[]}
+ */
 function getSkillAggregatedData() {
     try {
         if (employeeData.length === 0) return [];
 
-        const aggregated = {
-            'High': 0,
-            'Medium': 0,
-            'Low': 0,
-            'Unknown': 0
-        };
-
+        const aggregated = {};
         employeeData.forEach(row => {
-            let empId = row.sp_no;
-            if (!empId) return;
-            empId = String(empId).trim();
-
-            const skill = row.skill || 'Unknown';
-            if (aggregated[skill] === undefined) {
-                aggregated[skill] = 0;
-            }
-            aggregated[skill] += (parseFloat(row.totalHours) || 0);
+            if (!row.sp_no) return;
+            const skill = String(row.skill || 'UNKNOWN').toUpperCase();
+            aggregated[skill] = (aggregated[skill] || 0) + (parseFloat(row.totalHours) || 0);
         });
 
-        return Object.keys(aggregated)
-            .filter(k => aggregated[k] > 0 || k !== 'Unknown')
-            .map((skill, index) => ({
-                'SN': index + 1,
-                'Skill Level': skill,
-                'Total Hours': parseFloat(aggregated[skill].toFixed(2)),
-                'Total Shifts': parseFloat((aggregated[skill] / 8).toFixed(2))
-            }));
+        return Object.keys(aggregated).map((skill, index) => ({
+            'SL.NO.': index + 1,
+            'Skill Level': skill,
+            'Total Hours': parseFloat(aggregated[skill].toFixed(2)),
+            'Total Shifts': parseFloat((aggregated[skill] / 8).toFixed(2))
+        }));
     } catch (err) {
         console.error('getSkillAggregatedData error:', err);
         return [];
     }
 }
 
+// -----------------------------------------------
+// AGGREGATE VIEW TRIGGERS (called from HTML)
+// -----------------------------------------------
+
+/** Displays the employee-wise total-hours aggregated view. */
 function employeewiseTotalHours() {
     try {
         const resultData = getEmployeeAggregatedData();
         if (resultData.length === 0) return;
         renderAggregatedTable(resultData, ['SL.NO.', 'Safety Pass No', 'Employee Name', 'Total Hours', 'Total Shifts']);
         const btnExit = document.getElementById('btnExitAggregate');
-        if (btnExit) btnExit.style.display = 'flex';
+        if (btnExit) btnExit.classList.remove('is-hidden');
     } catch (err) {
         console.error('employeewiseTotalHours error:', err);
     }
 }
 
+/** Displays the skill-wise total-hours aggregated view. */
 function skillwiseTotalHours() {
     try {
         const resultData = getSkillAggregatedData();
         if (resultData.length === 0) return;
         renderAggregatedTable(resultData, ['SL.NO.', 'Skill Level', 'Total Hours', 'Total Shifts']);
         const btnExit = document.getElementById('btnExitAggregate');
-        if (btnExit) btnExit.style.display = 'flex';
+        if (btnExit) btnExit.classList.remove('is-hidden');
     } catch (err) {
         console.error('skillwiseTotalHours error:', err);
     }
 }
 
-//excel export fn
+// -----------------------------------------------
+// EXCEL EXPORT
+// -----------------------------------------------
+
+/**
+ * Exports `employeeData` and both aggregate views to a multi-sheet XLSX file.
+ */
 function exportToExcel() {
     try {
         if (employeeData.length === 0) return;
@@ -1204,22 +1436,1615 @@ function exportToExcel() {
         const workbook = XLSX.utils.book_new();
 
         const ws1 = XLSX.utils.json_to_sheet(employeeData);
-        XLSX.utils.book_append_sheet(workbook, ws1, "AttendanceData");
+        XLSX.utils.book_append_sheet(workbook, ws1, 'AttendanceData');
 
         const empData = getEmployeeAggregatedData();
         if (empData.length > 0) {
             const ws2 = XLSX.utils.json_to_sheet(empData);
-            XLSX.utils.book_append_sheet(workbook, ws2, "EmployeeHours");
+            XLSX.utils.book_append_sheet(workbook, ws2, 'EmployeeHours');
         }
 
         const skillData = getSkillAggregatedData();
         if (skillData.length > 0) {
             const ws3 = XLSX.utils.json_to_sheet(skillData);
-            XLSX.utils.book_append_sheet(workbook, ws3, "SkillHours");
+            XLSX.utils.book_append_sheet(workbook, ws3, 'SkillHours');
         }
 
-        XLSX.writeFile(workbook, "Calculated_Working_Hours.xlsx");
+        XLSX.writeFile(workbook, 'Calculated_Working_Hours.xlsx');
     } catch (err) {
         console.error('exportToExcel error:', err);
     }
 }
+
+
+
+================================================
+FILE: src/styles.css
+================================================
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+    --bg-base: linear-gradient(45deg, #ffffff, #c0cdda);
+    --bg-surface: #ffffff;
+    --bg-muted: #f8fafc;
+    --bg-soft: #f8fafc;
+    --text-primary: #020617;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --primary-color: #0f172a;
+    --primary-hover: #1e293b;
+    --primary-soft: #f1f5f9;
+    --success-bg: #f0fdf4;
+    --success-text: #166534;
+    --error-bg: #fef2f2;
+    --error-text: #991b1b;
+    --warning-bg: #fefce8;
+    --warning-text: #854d0e;
+    --focus-ring: #cbd5e1;
+    --flag-bg: #fff7ed;
+    --flag-text: #7c2d12;
+    --flag-border: #ea580c;
+    --radius-sm: 2px;
+    --radius-md: 4px;
+    --radius-lg: 6px;
+    --font-heading: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+    --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.04);
+    --shadow-md: 0 4px 12px rgba(2, 6, 23, 0.06);
+    --ease-std: 200ms ease;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+html {
+    color-scheme: light;
+}
+
+body {
+    min-height: 100dvh;
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    background: var(--bg-base);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input {
+    font: inherit;
+}
+
+button {
+    touch-action: manipulation;
+}
+
+button,
+label,
+input[type="checkbox"] {
+    cursor: pointer;
+}
+
+button:disabled {
+    cursor: not-allowed;
+}
+
+::selection {
+    background: var(--primary-color);
+    color: #ffffff;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.skip-link {
+    position: fixed;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 2000;
+    transform: translateY(-150%);
+    background: var(--text-primary);
+    color: #ffffff;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.skip-link:focus {
+    transform: translateY(0);
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 3px;
+}
+
+.is-hidden {
+    display: none !important;
+}
+
+:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 3px;
+}
+
+.app-container {
+    width: min(100%, 1600px);
+    min-height: 100dvh;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    padding: 0 1.5rem;
+}
+
+
+
+.header-actions,
+.footer-content {
+    display: flex;
+    align-items: center;
+}
+
+/* HEADER */
+.header {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 2rem 2rem;
+    background-color: var(--bg-surface);
+    border-bottom: 2px solid var(--primary-color);
+    border-radius: 0 0 50px 50px;
+    box-shadow: var(--shadow-md);
+}
+
+.header .logo-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.header .logo-group img {
+    height: 32px;
+}
+
+.step-number {
+    background-color: var(--bg-muted);
+    padding: 5px;
+    border-radius: 5px;
+    margin-right: 5px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.header .header-title {
+    font-size: 28px;
+    color: var(--text-secondary);
+    font-weight: 900;
+    word-spacing: 0.2rem;
+    font-variant: small-caps;
+    font-family: var(--font-body);
+    transition: all 0.3s ease-in-out;
+}
+
+.header .header-title:hover {
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.header .header-subtitle {
+    font-size: 14px;
+    color: #64748b;
+}
+
+/* MAIN */
+.main-content {
+    flex: 1;
+}
+
+/* ─── Step Block ─── */
+.step-block {
+    margin-bottom: 1.5rem;
+    background-color: white;
+    border-radius: 10px;
+    margin: 1rem;
+    padding: 1rem;
+}
+
+.step-heading {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    border-radius: 5px;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(to right, #64748b93, white);
+    border: solid 1px #475569;
+}
+
+.step-heading h2 {
+    font-weight: 300;
+    font-size: 20px;
+}
+
+/* ─── Control Panel ─── */
+.control-panel {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 1rem 0;
+    padding-bottom: 0;
+    border-top: 1px solid var(--border-color);
+}
+
+/* ─── Unified Button / Link ─── */
+.ctrl-btn,
+.stat-button,
+.column-toggle-btn {
+    min-height: 44px;
+    border-radius: var(--radius-sm);
+    transition: background-color var(--ease-std), color var(--ease-std), border-color var(--ease-std), box-shadow var(--ease-std);
+}
+
+.ctrl-btn,
+.stat-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.65rem 1.15rem;
+    border: 1px solid var(--border-strong);
+    font-weight: 500;
+    font-size: 0.9rem;
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    white-space: nowrap;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.ctrl-btn:not(:disabled):hover,
+.ctrl-btn:not(:disabled):focus-visible {
+    background: var(--bg-muted);
+    border-color: var(--primary-color);
+    box-shadow: var(--shadow-sm);
+}
+
+.ctrl-btn:disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+}
+
+/* ─── Upload Cards Row ─── */
+.upload-cards-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    /* flex-wrap: wrap; */
+}
+
+.step-block h4 {
+    font-size: 14px;
+    color: #64748b;
+    font-weight: 400;
+}
+
+.upload-card {
+    width: 100%;
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    text-align: center;
+    transition: border-color var(--ease-std), box-shadow var(--ease-std), background-color var(--ease-std);
+}
+
+.upload-card:hover,
+.upload-card:focus-within {
+    border-color: var(--primary-color);
+    background: var(--primary-soft);
+    box-shadow: var(--shadow-md);
+}
+
+/* ─── CLM Upload Warning ─── */
+.clm-upload-warning {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.85rem 1.15rem;
+    margin-bottom: 1rem;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning-text);
+    border-radius: var(--radius-md);
+    color: var(--warning-text);
+    font-size: 0.92rem;
+    font-weight: 500;
+    line-height: 1.45;
+}
+
+.clm-upload-warning svg {
+    flex-shrink: 0;
+}
+
+/* ─── Disabled Upload Cards ─── */
+.upload-cards-row.is-disabled {
+    opacity: 0.4;
+    filter: grayscale(0.6);
+}
+
+.upload-cards-row.is-disabled .upload-card {
+    cursor: not-allowed;
+}
+
+.upload-icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.clm-logo {
+    height: min(220px, 42vw);
+    max-width: 100%;
+    object-fit: contain;
+}
+
+.upload-title {
+    display: inline-flex;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0.55rem 1rem;
+    border-radius: var(--radius-sm);
+    background: var(--bg-muted);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+}
+
+.upload-helper {
+    max-width: fit-content;
+    font-size: 0.95rem;
+    padding: 0 1rem;
+    border-radius: 50px;
+    background-color: var(--border-strong);
+}
+
+.stat-button:hover,
+.column-toggle-btn:hover {
+    background: var(--bg-muted);
+}
+
+.master-file-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0.5rem 0.85rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.master-file-badge--idle {
+    background: var(--bg-muted);
+    color: var(--text-secondary);
+}
+
+.master-file-badge--loading {
+    background: var(--warning-bg);
+    color: var(--warning-text);
+}
+
+.master-file-badge--success {
+    background: var(--success-bg);
+    color: var(--success-text);
+}
+
+.master-file-badge--error {
+    background: var(--error-bg);
+    color: var(--error-text);
+}
+
+.bypass-master-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.85rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background-color var(--ease-std), border-color var(--ease-std), color var(--ease-std);
+}
+
+.bypass-master-label:hover {
+    border-color: var(--border-strong);
+}
+
+.bypass-master-label:has(input:checked) {
+    background: var(--warning-bg);
+    border-color: var(--warning-text);
+    color: var(--warning-text);
+}
+
+input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    accent-color: var(--primary-color);
+}
+
+.status-section {
+    margin-bottom: 1.5rem;
+}
+
+.status-card,
+.table-container {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.status-card {
+    padding: 0.65rem 0.85rem;
+}
+
+.status-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.status-header h2 {
+    font-size: 1rem;
+}
+
+.badge {
+    background: var(--text-primary);
+    color: #ffffff;
+    padding: 0.35rem 0.65rem;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.status-list {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+}
+
+.status-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.65rem;
+    background: var(--bg-soft);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    font-size: 0.82rem;
+}
+
+.status-item .file-name {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    overflow-wrap: anywhere;
+}
+
+.status-item.success {
+    background: var(--success-bg);
+    border-color: var(--success-text);
+    color: var(--success-text);
+}
+
+.status-item.error {
+    background: var(--error-bg);
+    border-color: var(--error-text);
+    color: var(--error-text);
+}
+
+.status-item .status-text:empty {
+    display: none;
+}
+
+.status-item .status-text {
+    font-weight: 700;
+    font-size: 0.75rem;
+}
+
+.data-section {
+    width: 100%;
+    margin: 0 auto 3rem;
+}
+
+.table-container {
+    width: 100%;
+    min-height: 480px;
+    padding: 1rem;
+    overflow-x: auto;
+}
+
+.data-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.search-box {
+    position: relative;
+    flex: 1 1 280px;
+    min-width: min(100%, 280px);
+    display: flex;
+}
+
+.search-icon {
+    position: absolute;
+    left: 0.9rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.search-box input {
+    width: 100%;
+    min-height: 44px;
+    padding: 0.65rem 1rem 0.65rem 2.6rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    background: var(--bg-surface);
+}
+
+.search-box input::placeholder {
+    color: #64748b;
+}
+
+.stat-button-danger {
+    background: var(--error-bg);
+    border-color: var(--error-text);
+    color: var(--error-text);
+}
+
+.stat-button-danger:hover,
+.stat-button-danger:focus-visible {
+    background: #fee2e2;
+}
+
+.column-picker-container {
+    position: relative;
+    display: flex;
+}
+
+.column-dropdown {
+    position: absolute;
+    top: calc(100% + 0.4rem);
+    right: 0;
+    z-index: 1000;
+    width: max-content;
+    max-width: min(92vw, 320px);
+    max-height: 380px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    padding: 0.75rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+.column-dropdown-header {
+    display: flex;
+    justify-content: flex-end;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.column-toggle-btn {
+    min-height: 36px;
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.column-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-height: 36px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+}
+
+caption {
+    text-align: left;
+    color: var(--text-secondary);
+    padding: 0 0 0.75rem;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+}
+
+thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--primary-color);
+    color: #ffffff;
+    padding: 0.75rem 0.85rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 2px solid var(--primary-hover);
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.3;
+    vertical-align: middle;
+}
+
+thead th:last-child,
+tbody td:last-child {
+    border-right: none;
+}
+
+.highlight-header {
+    background: var(--primary-hover);
+    color: #ffffff;
+}
+
+.sortable-header {
+    padding: 0;
+}
+
+.sort-header-button {
+    width: 100%;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.35rem;
+    padding: 0.75rem 0.85rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+}
+
+.sort-header-button:hover,
+.sort-header-button:focus-visible {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.sort-arrows {
+    display: inline-flex;
+    flex-direction: column;
+    line-height: 0.75;
+    font-size: 0.58rem;
+}
+
+.sort-arrow {
+    opacity: 0.45;
+}
+
+.sort-arrow.active {
+    opacity: 1;
+}
+
+tbody td {
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--border-color);
+    border-right: 1px solid #e2e8f0;
+    color: var(--text-primary);
+    background: var(--bg-surface);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+    text-transform: uppercase;
+}
+
+tbody tr:nth-child(even) td {
+    background: var(--bg-soft);
+}
+
+tbody tr:hover td {
+    background: #e6f6fb;
+}
+
+tbody td:nth-child(1) {
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+tbody td:nth-child(4),
+tbody td:nth-child(7),
+.highlight-hours {
+    font-weight: 700;
+}
+
+tbody td:nth-child(4),
+tbody td:nth-child(5),
+tbody td:nth-child(6),
+tbody td:nth-child(8),
+tbody td:nth-child(9),
+tbody td:nth-child(15),
+tbody td:nth-child(16),
+.highlight-hours {
+    background: #f8fafc;
+}
+
+tbody tr:nth-child(even) td:nth-child(4),
+tbody tr:nth-child(even) td:nth-child(5),
+tbody tr:nth-child(even) td:nth-child(6),
+tbody tr:nth-child(even) td:nth-child(8),
+tbody tr:nth-child(even) td:nth-child(9),
+tbody tr:nth-child(even) td:nth-child(15),
+tbody tr:nth-child(even) td:nth-child(16),
+tbody tr:nth-child(even) .highlight-hours {
+    background: #f1f5f9;
+}
+
+tbody td:nth-child(20) {
+    max-width: 18ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.flagged-shift {
+    background: var(--flag-bg) !important;
+    color: var(--flag-text);
+    border: 2px solid var(--flag-border);
+    font-weight: 700;
+}
+
+/* C-shift next-day punch-out indicator */
+.next-day-out {
+    position: relative;
+}
+
+.next-day-badge {
+    display: inline-block;
+    margin-left: 2px;
+    padding: 0 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #1d4ed8;
+    background: #dbeafe;
+    border-radius: 3px;
+    vertical-align: super;
+    cursor: help;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 2rem;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.empty-state-icon {
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+}
+
+.empty-state p {
+    font-weight: 700;
+}
+
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+    background: var(--bg-muted);
+}
+
+::-webkit-scrollbar-thumb {
+    background: #64748b;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--bg-muted);
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-primary);
+}
+
+.footer {
+    display: flex;
+    height: fit-content;
+    padding: .3rem 0;
+    justify-content: center;
+    align-items: center;
+    border-top: 1px solid var(--border-color);
+}
+
+.footer-content {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.footer-icon {
+    width: 16px;
+    height: 16px;
+}
+
+.footer-email,
+.footer-brand {
+    font-size: 0.9rem;
+}
+
+.footer-brand {
+    font-weight: 700;
+}
+
+@media (max-width: 760px) {
+    .app-container {
+        padding-inline: 1rem;
+    }
+
+    .header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .header-actions,
+    .ctrl-btn,
+    .stat-button {
+        width: 100%;
+    }
+
+    .upload-cards-row {
+        grid-template-columns: 1fr;
+    }
+
+    .upload-card {
+        min-height: 220px;
+    }
+
+    .master-file-badge,
+    .bypass-master-label,
+    .search-box,
+    .column-picker-container {
+        width: 100%;
+    }
+
+    .column-dropdown {
+        left: 0;
+        right: auto;
+    }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+
+================================================
+FILE: src/uploadProcessFiles.js
+================================================
+// uploadProcessFiles.js
+// Handles all file upload events and file processing for both Presentee and PiPo report types.
+// Dependencies: hoursProcessing.js, main.js (employeeData, masterEmployeeDetails, masterFileUploaded, DOM refs)
+
+// -----------------------------------------------
+// PIPO FILE UPLOAD HANDLER
+// -----------------------------------------------
+
+/**
+ * Event handler for the PiPo (Punch-In/Punch-Out) file input.
+ * Clears state, processes each selected file, then triggers a table render.
+ */
+async function handlePipoFileSelect(event) {
+    try {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+
+        statusSection.classList.remove('is-hidden');
+        fileStatusList.innerHTML    = '';
+        employeeData                = [];
+        tableBody.innerHTML         = '';
+
+        fileCountBadge.textContent = `${files.length} File${files.length > 1 ? 's' : ''}`;
+
+        for (const file of files) {
+            await processPipoFile(file);
+        }
+
+        renderTable();
+
+        if (employeeData.length > 0) {
+            exportBtn.disabled = false;
+            const btnEmployeeTotal = document.getElementById('btnEmployeeTotal');
+            const btnSkillTotal    = document.getElementById('btnSkillTotal');
+            if (btnEmployeeTotal) btnEmployeeTotal.classList.remove('is-hidden');
+            if (btnSkillTotal)    btnSkillTotal.classList.remove('is-hidden');
+        }
+    } catch (err) {
+        console.error('handlePipoFileSelect error:', err);
+    }
+}
+
+// -----------------------------------------------
+// C-SHIFT CROSS-DATE RESOLUTION (shared)
+// -----------------------------------------------
+
+const C_SHIFT_THRESHOLD_MINS = 20 * 60; // 20:00 — evening punch-in signals C-shift
+
+/**
+ * Parses a normalised date string (DD-MM-YYYY or D-Mon-YY) into a sortable ms timestamp.
+ */
+function _parseDateForCShift(ds) {
+    if (!ds) return 0;
+    const monthNames = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+    const parts = ds.split(/[-\/]/);
+    if (parts.length >= 3) {
+        const day = parseInt(parts[0], 10);
+        let mon = parseInt(parts[1], 10);
+        if (isNaN(mon)) mon = (monthNames[(parts[1] || '').toLowerCase()] ?? 0) + 1;
+        let yr = parseInt(parts[2], 10);
+        if (yr < 100) yr += 2000;
+        return new Date(yr, mon - 1, day).getTime();
+    }
+    return 0;
+}
+
+/**
+ * Post-processing pass over employeeData to fix C-shift overnight punch-outs.
+ *
+ * In CLM Presentee files the "Out Time" on date X is actually the morning exit
+ * from the PREVIOUS night's C-shift (date X-1).  This function:
+ *   1. Groups entries by employee (sp_no) and sorts by date.
+ *   2. For consecutive C-shift entries, takes the NEXT date's punchOut as
+ *      the current date's actual exit.
+ *   3. Recalculates shift, hours, etc. for every modified row.
+ *   4. The last C-shift entry in a run gets punchOut = '' (N/A).
+ */
+function _resolveCShiftCrossDate() {
+    // Group by employee
+    const byEmployee = {};
+    employeeData.forEach((row, idx) => {
+        if (!byEmployee[row.sp_no]) byEmployee[row.sp_no] = [];
+        byEmployee[row.sp_no].push({ row, idx });
+    });
+
+    Object.values(byEmployee).forEach(entries => {
+        // Sort by date
+        entries.sort((a, b) => _parseDateForCShift(a.row.date) - _parseDateForCShift(b.row.date));
+
+        // Identify C-shift entries (punchIn in minutes >= 20:00)
+        const cShiftIndices = [];
+        entries.forEach((entry, pos) => {
+            const inMins = parseTimeFormatToMinutes(entry.row.punchIn);
+            if (inMins !== null && inMins >= C_SHIFT_THRESHOLD_MINS) {
+                cShiftIndices.push(pos);
+            }
+        });
+
+        if (cShiftIndices.length === 0) return;
+
+        // Resolve: current C-shift's punchOut = next entry's punchOut
+        cShiftIndices.forEach((pos, i) => {
+            const currentRow = entries[pos].row;
+            const nextEntry  = entries[pos + 1]; // next calendar-date entry for this employee
+
+            let newPunchOut = '';
+            let punchOutDate = ''; // date the punch-out actually falls on
+            if (nextEntry) {
+                const nextOutMins = parseTimeFormatToMinutes(nextEntry.row.punchOut);
+                // Only take if the next entry's Out is a morning time (< 12:00)
+                if (nextOutMins !== null && nextOutMins < 12 * 60) {
+                    newPunchOut = nextEntry.row.punchOut;
+                    punchOutDate = nextEntry.row.date; // the next calendar date
+                }
+            }
+
+            // Update punchOut and tag with next-day date for rendering
+            currentRow.punchOut = newPunchOut;
+            currentRow.punchOutNextDate = punchOutDate || null;
+
+            // Recalculate shift, hours, duty for this row
+            const inTime  = currentRow.punchIn;
+            const outTime = currentRow.punchOut;
+
+            const shift = assignShift(currentRow.sp_no, inTime, outTime);
+            let shiftIn = '', shiftOut = '';
+            let shiftInMins = null, shiftOutMins = null;
+
+            if (shift && SHIFT_DEFINITIONS[shift]) {
+                shiftIn      = SHIFT_DEFINITIONS[shift].shiftIn;
+                shiftOut     = SHIFT_DEFINITIONS[shift].shiftOut;
+                shiftInMins  = parseTimeFormatToMinutes(shiftIn);
+                shiftOutMins = parseTimeFormatToMinutes(shiftOut);
+            }
+
+            const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, currentRow.inOT, currentRow.outOT);
+            const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
+            const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
+            const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, currentRow.addLunch);
+            const otHours    = calculateOtHours(currentRow.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
+
+            currentRow.shift      = shift;
+            currentRow.shiftIn    = shiftIn;
+            currentRow.shiftOut   = shiftOut;
+            currentRow.dutyIn     = formattedDutyIn;
+            currentRow.dutyOut    = formattedDutyOut;
+            currentRow.dutyHours  = parseFloat(dutyHours.toFixed(2));
+            currentRow.otHours    = parseFloat(otHours.toFixed(2));
+            currentRow.totalHours = parseFloat((dutyHours + otHours).toFixed(2));
+        });
+
+        // Last C-shift entry in the run: punchOut is already '' if no next entry existed,
+        // which means hours will be 0 — correct per requirements.
+    });
+
+    console.log('[C-Shift Resolve] Post-processed employeeData:', employeeData);
+}
+
+// -----------------------------------------------
+// PRESENTEE FILE UPLOAD HANDLER
+// -----------------------------------------------
+
+/**
+ * Event handler for the Presentee (CLM) file input.
+ * Clears state, processes each selected file, then triggers a table render.
+ */
+async function handlePresenteeFileSelect(event) {
+    try {
+        const files = Array.from(event.target.files);
+        if (!files.length) return;
+
+        statusSection.classList.remove('is-hidden');
+        fileStatusList.innerHTML    = '';
+        employeeData                = [];
+        tableBody.innerHTML         = '';
+
+        fileCountBadge.textContent = `${files.length} File${files.length > 1 ? 's' : ''}`;
+
+        for (const file of files) {
+            await processPresenteeFile(file);
+        }
+
+        // Fix C-shift overnight punch-outs across dates
+        _resolveCShiftCrossDate();
+
+        renderTable();
+
+        if (employeeData.length > 0) {
+            exportBtn.disabled = false;
+            const btnEmployeeTotal = document.getElementById('btnEmployeeTotal');
+            const btnSkillTotal    = document.getElementById('btnSkillTotal');
+            if (btnEmployeeTotal) btnEmployeeTotal.classList.remove('is-hidden');
+            if (btnSkillTotal)    btnSkillTotal.classList.remove('is-hidden');
+        }
+    } catch (err) {
+        console.error('handlePresenteeFileSelect error:', err);
+    }
+}
+
+// -----------------------------------------------
+// PRESENTEE FILE PROCESSOR
+// -----------------------------------------------
+
+/**
+ * Reads and parses a single CLM-Presentee Excel file.
+ * - Extracts the attendance date from cell B3 (or searches the first 10 rows).
+ * - Locates the header row by scanning for known column identifiers.
+ * - Maps each employee row into the unified employeeData structure.
+ */
+async function processPresenteeFile(file) {
+    const statusItem = document.createElement('li');
+    statusItem.className = 'status-item';
+    statusItem.innerHTML = `
+        <span class="file-name">${file.name}</span>
+        <span class="status-text"></span>
+    `;
+    fileStatusList.appendChild(statusItem);
+
+    try {
+        const data      = await file.arrayBuffer();
+        const workbook  = XLSX.read(data, { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+        // Convert sheet to array-of-arrays for header/metadata scanning
+        const rawJsonArray = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+        // --- 1. Extract attendance date from B3, or search first 10 rows ---
+        let rawDateStr = '';
+        const b3Val = worksheet['B3'] ? worksheet['B3'].v : '';
+        if (b3Val) {
+            const dateMatch = b3Val.toString().match(/Date\s*:\s*(.+)/i);
+            if (dateMatch) rawDateStr = dateMatch[1].trim();
+        }
+
+        if (!rawDateStr) {
+            for (let i = 0; i < Math.min(10, rawJsonArray.length); i++) {
+                const fallbackMatch = rawJsonArray[i].join(' ').match(/Date\s*:\s*(.+)/i);
+                if (fallbackMatch) {
+                    rawDateStr = fallbackMatch[1].trim();
+                    break;
+                }
+            }
+        }
+
+        const normalizedDate = normalizeDate(rawDateStr);
+
+        // --- 2. Locate header row ---
+        let headerRowIndex = -1;
+        for (let i = 0; i < rawJsonArray.length; i++) {
+            const rowStr = rawJsonArray[i].join('').toLowerCase().replace(/\s+/g, '').replace(/-/g, '');
+            if (rowStr.includes('safetypassno') || rowStr.includes('employeename') || rowStr.includes('intime')) {
+                headerRowIndex = i;
+                break;
+            }
+        }
+
+        if (headerRowIndex === -1) {
+            throw new Error('Could not identify the header row in this file.');
+        }
+
+        // --- 3. Parse tabular records ---
+        const dataRows = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex, defval: '' });
+
+        // --- 4. Map each row to the employee data structure ---
+        const processedRows = dataRows
+            .filter(row => {
+                const empName = row['Employee Name'] ? String(row['Employee Name']).trim() : '';
+                const empId   = row['Safety Pass No'] ? String(row['Safety Pass No']).trim() : '';
+                return empName && empId;
+            })
+            .map(row => {
+                const inTimeRaw  = String(row['In Time']  || row['In-Time']  || '').trim();
+                const outTimeRaw = String(row['Out Time'] || row['Out-Time'] || '').trim();
+
+                const inMins  = parseTimeFormatToMinutes(inTimeRaw);
+                const outMins = parseTimeFormatToMinutes(outTimeRaw);
+
+                const inTime   = inMins  !== null ? formatMinutesTo24h(inMins)  : inTimeRaw;
+                const outTime  = outMins !== null ? formatMinutesTo24h(outMins) : outTimeRaw;
+
+                const employeeId = String(row['Safety Pass No'] || '').trim();
+                const addLunch   = addLunchCheckbox ? addLunchCheckbox.checked : false;
+
+                // Enrich from master-sheet employee data (if uploaded and not bypassed)
+                let skillVal         = null;
+                let designationVal   = null;
+                let shiftsAllowedVal = [];
+                let inOtAllowed      = false;
+                let outOtAllowed     = false;
+
+                const bypassMaster = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
+                if (masterFileUploaded && !bypassMaster) {
+                    const empDetails = masterEmployeeDetails.find(e => e.sp_no === employeeId);
+                    if (empDetails) {
+                        skillVal         = empDetails.skill         || null;
+                        designationVal   = empDetails.designation   || null;
+                        shiftsAllowedVal = empDetails.allowedShifts || [];
+                        inOtAllowed      = !!empDetails.inOtAllowed;
+                        outOtAllowed     = !!empDetails.outOtAllowed;
+                    }
+                }
+
+                // Shift assignment
+                const shift = assignShift(employeeId, inTime, outTime);
+                let shiftIn = '', shiftOut = '';
+                let shiftInMins = null, shiftOutMins = null;
+
+                if (shift && SHIFT_DEFINITIONS[shift]) {
+                    shiftIn      = SHIFT_DEFINITIONS[shift].shiftIn;
+                    shiftOut     = SHIFT_DEFINITIONS[shift].shiftOut;
+                    shiftInMins  = parseTimeFormatToMinutes(shiftIn);
+                    shiftOutMins = parseTimeFormatToMinutes(shiftOut);
+                }
+
+                // Hours calculation
+                const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
+                const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
+                const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
+
+                const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
+                const otHours    = calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
+                const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
+
+                return {
+                    date:          normalizedDate,
+                    sp_no:         employeeId,
+                    name:          row['Employee Name']  || '',
+                    vendor_name:   row['Vendor Name']    || '',
+                    workorder_no:  row['Workorder No']   || '',
+                    dept_name:     row['Department Name']|| '',
+                    section:       row['Section']        || '',
+                    skill:         skillVal,
+                    inOT:          inOtAllowed,
+                    outOT:         outOtAllowed,
+                    designation:   designationVal,
+                    shiftsAllowed: shiftsAllowedVal,
+                    shift,
+                    shiftIn,
+                    shiftOut,
+                    punchIn:       inTime,
+                    punchOut:      outTime,
+                    dutyIn:        formattedDutyIn,
+                    dutyOut:       formattedDutyOut,
+                    addLunch,
+                    dutyHours:     parseFloat(dutyHours.toFixed(2)),
+                    otHours:       parseFloat(otHours.toFixed(2)),
+                    totalHours
+                };
+            });
+
+        employeeData = employeeData.concat(processedRows);
+
+        statusItem.classList.add('success');
+        statusItem.querySelector('.status-text').textContent = '';
+
+    } catch (err) {
+        console.error('processPresenteeFile error:', err);
+        statusItem.classList.add('error');
+        statusItem.querySelector('.status-text').textContent = 'Failed';
+    }
+}
+
+// -----------------------------------------------
+// PIPO FILE PROCESSOR
+// -----------------------------------------------
+
+/**
+ * Reads and parses a single CLM-Punch Records (PiPo) Excel file.
+ * Expected columns: Date | Safety Pass No | Flag (IN/OUT) | Punch Time/HH:MM:SS
+ * - Groups all punch records per employee.
+ * - Takes the earliest IN and latest OUT punch for each employee per day.
+ * - Maps results into the unified employeeData structure.
+ */
+async function processPipoFile(file) {
+    const statusItem = document.createElement('li');
+    statusItem.className = 'status-item';
+    statusItem.innerHTML = `
+        <span class="file-name">${file.name}</span>
+        <span class="status-text"></span>
+    `;
+    fileStatusList.appendChild(statusItem);
+
+    try {
+        const data      = await file.arrayBuffer();
+        const workbook  = XLSX.read(data, { type: 'array' });
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+
+        const rawJsonArray = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+        console.log('Raw JSON Array:', rawJsonArray);
+
+        // --- 1. Locate header row ---
+        let headerRowIndex = -1;
+        for (let i = 0; i < rawJsonArray.length; i++) {
+            const rowStr = rawJsonArray[i]
+                .join('').toLowerCase()
+                .replace(/\s+/g, '').replace(/-/g, '').replace(/\//g, '');
+            if (
+                (rowStr.includes('safetypassno') || rowStr.includes('safetyno')) &&
+                (rowStr.includes('flag') || rowStr.includes('punchtime'))
+            ) {
+                headerRowIndex = i;
+                break;
+            }
+        }
+
+        if (headerRowIndex === -1) {
+            throw new Error(
+                'Could not identify the header row. ' +
+                'Expected columns: Safety No. (or Safety Pass No), Flag, Punch Time/HH:MM:SS'
+            );
+        }
+
+        // --- 2. Parse rows into data objects ---
+        const dataRows = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex, defval: '' });
+
+        // --- 3. Group punch records by Safety Pass No + Date ---
+        const tempMap = {};
+
+        dataRows.forEach(row => {
+            let date = row['Date'] || '';
+
+            // Convert Excel serial date number to readable date string
+            if (typeof date === 'number') {
+                const utcMs = (date - 25569) * 86400 * 1000; // Excel epoch → Unix epoch
+                const d     = new Date(utcMs);
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                date = `${d.getUTCDate()}-${months[d.getUTCMonth()]}-${String(d.getUTCFullYear()).slice(-2)}`;
+            }
+
+            const spNo        = row['Safety Pass No'] || row['Safety No.'] || '';
+            const flag        = row['Flag']                                 || '';
+            const time        = row['Punch Time/HH:MM:SS'] || row['Punch Time'] || '';
+            const vendorName  = row['Vendor Name']  || '';
+            const workorderNo = row['Workorder No'] || '';
+            const workmanName = row['Workman Name'] || row['Employee Name'] || '';
+            const deptName    = row['Dept. Name'] || row['Department Name'] || '';
+
+            if (!spNo) return;
+
+            const groupKey = `${spNo}||${date}`;
+
+            if (!tempMap[groupKey]) {
+                tempMap[groupKey] = {
+                    date,
+                    sp_no:         spNo,
+                    inTimes:       [],
+                    outTimes:      [],
+                    vendor_name:   vendorName,
+                    workorder_no:  workorderNo,
+                    workman_name:  workmanName,
+                    dept_name:     deptName
+                };
+            }
+
+            // Convert punch time to minutes since midnight
+            const toMins = val => {
+                if (val === '' || val === null || val === undefined) return null;
+                if (typeof val === 'number') return Math.round((val % 1) * 1440);
+                return parseTimeFormatToMinutes(String(val));
+            };
+
+            const timeMins = toMins(time);
+            if (timeMins === null) return;
+
+            if (flag === 'IN')       tempMap[groupKey].inTimes.push(timeMins);
+            else if (flag === 'OUT') tempMap[groupKey].outTimes.push(timeMins);
+        });
+
+        console.log('tempMap (per employee+date):', tempMap);
+
+        // --- 4. Resolve punch pairs, handling C-shift overnight boundaries ---
+        // Helper: parse date strings like "1-Apr-26" or "4/Apr/26" into sortable timestamps
+        const _monthIdx = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+        const _parsePipoDate = ds => {
+            const parts = ds.split(/[-\/]/);
+            if (parts.length >= 3) {
+                const day = parseInt(parts[0], 10);
+                const mon = _monthIdx[(parts[1] || '').toLowerCase()] || 0;
+                let yr = parseInt(parts[2], 10);
+                if (yr < 100) yr += 2000;
+                return new Date(yr, mon, day).getTime();
+            }
+            return 0;
+        };
+
+        const C_SHIFT_IN_THRESHOLD = 20 * 60;  // 20:00 = 1200 min — evening IN signals C-shift
+        const MORNING_OUT_CUTOFF   = 12 * 60;  // 12:00 = 720 min  — morning OUT belongs to prev C-shift
+
+        // Group per-date records by employee for cross-date resolution
+        const byEmployee = {};
+        Object.values(tempMap).forEach(g => {
+            if (!byEmployee[g.sp_no]) byEmployee[g.sp_no] = [];
+            byEmployee[g.sp_no].push(g);
+        });
+
+        const pipoEmployeeDetails = [];
+
+        Object.values(byEmployee).forEach(groups => {
+            // Sort this employee's date-groups chronologically
+            groups.sort((a, b) => _parsePipoDate(a.date) - _parsePipoDate(b.date));
+
+            // Track which morning OUTs are "consumed" by a previous C-shift
+            const consumedMorningOuts = new Set(); // indices of groups whose morning OUTs were used
+
+            // First pass: identify C-shift entries and consume next-date morning OUTs
+            groups.forEach((group, idx) => {
+                const eveningIns = group.inTimes.filter(m => m >= C_SHIFT_IN_THRESHOLD);
+
+                if (eveningIns.length > 0) {
+                    // This date has a C-shift start
+                    const punchInMins = Math.min(...eveningIns);
+                    let punchOutMins = null;
+
+                    // Look for morning OUT on the NEXT date for this employee
+                    const nextGroup = groups[idx + 1];
+                    if (nextGroup) {
+                        const morningOuts = nextGroup.outTimes.filter(m => m < MORNING_OUT_CUTOFF);
+                        if (morningOuts.length > 0) {
+                            punchOutMins = Math.max(...morningOuts);
+                            consumedMorningOuts.add(idx + 1); // mark next date's morning OUTs as consumed
+                        }
+                    }
+
+                    pipoEmployeeDetails.push({
+                        date: group.date, sp_no: group.sp_no,
+                        punchInMins, punchOutMins,
+                        punchOutNextDate: (punchOutMins !== null && nextGroup) ? nextGroup.date : null,
+                        vendorName: group.vendor_name, workorderNo: group.workorder_no,
+                        workmanName: group.workman_name, deptName: group.dept_name
+                    });
+                }
+            });
+
+            // Second pass: regular (non-C) shift entries
+            groups.forEach((group, idx) => {
+                const regularIns = group.inTimes.filter(m => m < C_SHIFT_IN_THRESHOLD);
+                if (regularIns.length === 0) return; // no daytime IN → skip (C-shift only day)
+
+                const punchInMins = Math.min(...regularIns);
+
+                // Exclude morning OUTs if they were consumed by the previous C-shift
+                let availableOuts = group.outTimes;
+                if (consumedMorningOuts.has(idx)) {
+                    availableOuts = availableOuts.filter(m => m >= MORNING_OUT_CUTOFF);
+                }
+
+                const punchOutMins = availableOuts.length > 0 ? Math.max(...availableOuts) : null;
+
+                pipoEmployeeDetails.push({
+                    date: group.date, sp_no: group.sp_no,
+                    punchInMins, punchOutMins,
+                    vendorName: group.vendor_name, workorderNo: group.workorder_no,
+                    workmanName: group.workman_name, deptName: group.dept_name
+                });
+            });
+        });
+
+        // Sort final results by date for consistent output
+        pipoEmployeeDetails.sort((a, b) => _parsePipoDate(a.date) - _parsePipoDate(b.date));
+
+        console.log('pipoEmployeeDetails:', pipoEmployeeDetails);
+
+        // --- 5. Convert to unified employeeData rows ---
+        const addLunch    = addLunchCheckbox ? addLunchCheckbox.checked : false;
+        const processedRows = [];
+
+        pipoEmployeeDetails.forEach(emp => {
+            // Minutes since midnight → HH:MM string
+            const inTime  = emp.punchInMins  !== null ? formatMinutesTo24h(emp.punchInMins)  : '';
+            const outTime = emp.punchOutMins !== null ? formatMinutesTo24h(emp.punchOutMins) : '';
+
+            const normalizedDate = emp.date ? normalizeDate(emp.date) : '';
+
+            // Enrich from master-sheet employee data (if uploaded and not bypassed)
+            let skillVal         = null;
+            let designationVal   = null;
+            let shiftsAllowedVal = [];
+            let inOtAllowed      = false;
+            let outOtAllowed     = false;
+            let nameVal          = emp.workmanName || '';  // default from CLM punch data
+
+            const bypassMaster = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
+            if (masterFileUploaded && !bypassMaster) {
+                const empDetails = masterEmployeeDetails.find(e => e.sp_no === emp.sp_no);
+                if (empDetails) {
+                    skillVal         = empDetails.skill         || null;
+                    designationVal   = empDetails.designation   || null;
+                    shiftsAllowedVal = empDetails.allowedShifts || [];
+                    inOtAllowed      = !!empDetails.inOtAllowed;
+                    outOtAllowed     = !!empDetails.outOtAllowed;
+                    nameVal          = empDetails.name          || nameVal;
+                }
+            }
+
+            // Shift assignment
+            const shift = assignShift(emp.sp_no, inTime, outTime);
+            let shiftIn = '', shiftOut = '';
+            let shiftInMins = null, shiftOutMins = null;
+
+            if (shift && SHIFT_DEFINITIONS[shift]) {
+                shiftIn      = SHIFT_DEFINITIONS[shift].shiftIn;
+                shiftOut     = SHIFT_DEFINITIONS[shift].shiftOut;
+                shiftInMins  = parseTimeFormatToMinutes(shiftIn);
+                shiftOutMins = parseTimeFormatToMinutes(shiftOut);
+            }
+
+            // Hours calculation
+            const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
+            const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
+            const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
+
+            const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
+            const otHours    = calculateOtHours(emp.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
+            const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
+
+            processedRows.push({
+                date:          normalizedDate,
+                sp_no:         emp.sp_no,
+                name:          nameVal,
+                vendor_name:   emp.vendorName   || '',
+                workorder_no:  emp.workorderNo  || '',
+                dept_name:     emp.deptName      || '',
+                section:       '',
+                skill:         skillVal,
+                inOT:          inOtAllowed,
+                outOT:         outOtAllowed,
+                designation:   designationVal,
+                shiftsAllowed: shiftsAllowedVal,
+                shift,
+                shiftIn,
+                shiftOut,
+                punchIn:       inTime,
+                punchOut:      outTime,
+                punchOutNextDate: emp.punchOutNextDate || null,
+                dutyIn:        formattedDutyIn,
+                dutyOut:       formattedDutyOut,
+                addLunch,
+                dutyHours:     parseFloat(dutyHours.toFixed(2)),
+                otHours:       parseFloat(otHours.toFixed(2)),
+                totalHours
+            });
+        });
+
+        employeeData = employeeData.concat(processedRows);
+
+        statusItem.classList.add('success');
+        statusItem.querySelector('.status-text').textContent = '';
+
+    } catch (err) {
+        console.error('processPipoFile error:', err);
+        statusItem.classList.add('error');
+        statusItem.querySelector('.status-text').textContent = 'Failed';
+    }
+}
+
+
