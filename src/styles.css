@@ -276,32 +276,33 @@ button:disabled {
 .upload-cards-row {
     display: flex;
     justify-content: center;
-    align-items: center;
-    gap: 1rem;
+    align-items: stretch;
+    gap: 1.5rem;
     /* flex-wrap: wrap; */
 }
 
 .step-block h4 {
-    font-size: 14px;
-    color: #64748b;
-    font-weight: 400;
+    align-self: center;
+    font-size: 16px;
+    color: var(--text-muted);
+    font-weight: 600;
 }
 
 .upload-card {
-    width: 100%;
-    min-height: 300px;
+    flex: 1;
+    min-height: 250px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 0.75rem;
-    padding: 1.5rem;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 2rem 1.5rem;
     background: var(--bg-surface);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-sm);
     text-align: center;
-    transition: border-color var(--ease-std), box-shadow var(--ease-std), background-color var(--ease-std);
+    transition: border-color var(--ease-std), box-shadow var(--ease-std), background-color var(--ease-std), transform var(--ease-std);
 }
 
 .upload-card:hover,
@@ -309,6 +310,7 @@ button:disabled {
     border-color: var(--primary-color);
     background: var(--primary-soft);
     box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
 }
 
 /* ─── CLM Upload Warning ─── */
@@ -339,38 +341,27 @@ button:disabled {
 
 .upload-cards-row.is-disabled .upload-card {
     cursor: not-allowed;
+    transform: none;
 }
 
 .upload-icon {
     display: flex;
     justify-content: center;
     align-items: center;
+    flex: 1;
+    min-height: 150px;
 }
 
 .clm-logo {
-    height: min(220px, 42vw);
+    height: 180px;
     max-width: 100%;
     object-fit: contain;
+    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+    transition: transform var(--ease-std);
 }
 
-.upload-title {
-    display: inline-flex;
-    min-height: 44px;
-    align-items: center;
-    justify-content: center;
-    padding: 0.55rem 1rem;
-    border-radius: var(--radius-sm);
-    background: var(--bg-muted);
-    color: var(--text-primary);
-    border: 1px solid var(--border-color);
-}
-
-.upload-helper {
-    max-width: fit-content;
-    font-size: 0.95rem;
-    padding: 0 1rem;
-    border-radius: 50px;
-    background-color: var(--border-strong);
+.upload-card:hover .clm-logo {
+    transform: scale(1.02);
 }
 
 .stat-button:hover,
