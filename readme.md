@@ -4,28 +4,26 @@
 
 A browser-based attendance reconciliation engine that transforms raw CLM (Contract Labour Management) portal data into accurate, shift-aware working-hours reports — complete with overtime calculations, skill-wise aggregations, and one-click Excel export.
 
-### 🔗 Live Link
+## Live Link
 
-[https://alqamah.github.io/TSL---FMM-I-CG-AutomatedAttendanceBillingEngine/src/index.html](https://alqamah.github.io/TSL---FMM-I-CG-AutomatedAttendanceBillingEngine/src/index.html)
+[https://alqamah.github.io/TSL---Attendance_Reconciliation_Automation/src/index.html](https://alqamah.github.io/TSL---Attendance_Reconciliation_Automation/src/index.html)
 
 ---
 
 ## Features
 
-### 📂 Dual CLM Report Support
+### Dual CLM Report Support
 
 The tool accepts **two different CLM report formats**, covering the full range of data exports available from the CLM portal:
 
-| Report Type | Description |
-| :--- | :--- |
-| **Presentee Report** | Daily attendance report with one row per employee per date, containing In Time and Out Time. |
-| **Punch-In / Punch-Out (PiPo) Report** | Raw punch record log with individual IN/OUT flag entries and timestamps. The tool groups records by employee + date, takes the earliest IN and latest OUT to derive the punch pair. |
+* **Presentee Report**: Daily attendance report with one row per employee per date, containing In Time and Out Time.
+* **Punch-In / Punch-Out (PiPo) Report**: Raw punch record log with individual IN/OUT flag entries and timestamps. The tool groups records by employee + date, takes the earliest IN and latest OUT to derive the punch pair.
 
 Both report types support **multi-file upload** — select multiple Excel files at once and they will be processed and merged into a single unified view.
 
 ---
 
-### 📋 Master Sheet Upload (Step 1)
+### Master Sheet Upload (Step 1)
 
 An optional but recommended first step. Upload a Master Excel Sheet (`.xlsx`) containing employee metadata. The master file has **two sheets**:
 
@@ -47,19 +45,18 @@ An optional but recommended first step. Upload a Master Excel Sheet (`.xlsx`) co
 | In | Shift start time |
 | Out | Shift end time |
 
-If Sheet 2 is absent, the tool falls back to the **default shift definitions** (see below).
-
-A downloadable **MasterSheet Format template** is provided in the UI for reference.
+* If Sheet 2 is absent, the tool falls back to the **default shift definitions** (see below).
+* A downloadable **MasterSheet Format template** is provided in the UI for reference.
 
 #### Bypass Master Sheet
 
-A **"Bypass Master-Sheet"** checkbox allows users to skip the master file upload and proceed directly with CLM data. In this mode, the tool will still auto-assign shifts based on punch times but will not have access to employee-specific metadata (skill, designation, OT permissions, allowed shifts).
-
-When neither a master file is uploaded nor the bypass checkbox is checked, the CLM upload area (Step 2) is **gated** — clicking it will surface a warning banner prompting the user to upload a master file or enable bypass.
+* A **"Bypass Master-Sheet"** checkbox allows users to skip the master file upload and proceed directly with CLM data.
+* In this mode, the tool will still auto-assign shifts based on punch times but will not have access to employee-specific metadata (skill, designation, OT permissions, allowed shifts).
+* When neither a master file is uploaded nor the bypass checkbox is checked, the CLM upload area (Step 2) is **gated** — clicking it will surface a warning banner prompting the user to upload a master file or enable bypass.
 
 ---
 
-### ⏱ Smart Shift Assignment
+### Smart Shift Assignment
 
 The tool **discards CLM's own shift allocation** and re-assigns the best-matching shift based on actual punch-in/out times using a multi-stage proximity algorithm:
 
@@ -69,7 +66,7 @@ The tool **discards CLM's own shift allocation** and re-assigns the best-matchin
 
 ---
 
-### 🕐 Duty In (Check-In) Time Logic
+### Duty In (Check-In) Time Logic
 
 | Scenario | Condition | Duty In Assigned | Example |
 | :--- | :--- | :--- | :--- |
@@ -77,7 +74,7 @@ The tool **discards CLM's own shift allocation** and re-assigns the best-matchin
 | **Normal / Grace** | Checked in up to 15 mins late OR slightly early | Exact Shift In time | Shift 08:30. Arrived 08:42 → Duty In 08:30 |
 | **Late** | Checked in > 15 mins late | Rounded UP to the next 30 minutes (Penalty) | Shift 08:30. Arrived 08:47 → Duty In 09:00 |
 
-### 🕐 Duty Out (Check-Out) Time Logic
+### Duty Out (Check-Out) Time Logic
 
 | Scenario | Condition | Duty Out Assigned | Example |
 | :--- | :--- | :--- | :--- |
@@ -87,42 +84,42 @@ The tool **discards CLM's own shift allocation** and re-assigns the best-matchin
 
 ### Overtime (OT) Policy
 
-- OT is calculated **only when permitted** per the employee's master data entry (`inOtAllowed` / `outOtAllowed`).
-- If *In-OT is allowed and applicable*: **inOT = shiftIn − dutyIn**
-- If *Out-OT is allowed and applicable*: **outOT = dutyOut − shiftOut**
-- **totalOT = inOT + outOT**
-- OT is only granted for ≥ 1 full hour beyond the shift boundary.
-- Final OT value is **floored to 0.5-hour increments**.
+* OT is calculated **only when permitted** per the employee's master data entry (`inOtAllowed` / `outOtAllowed`).
+* If *In-OT is allowed and applicable*: **inOT = shiftIn − dutyIn**
+* If *Out-OT is allowed and applicable*: **outOT = dutyOut − shiftOut**
+* **totalOT = inOT + outOT**
+* OT is only granted for ≥ 1 full hour beyond the shift boundary.
+* Final OT value is **floored to 0.5-hour increments**.
 
 ### Duty Hours Calculation
 
-- Net duty = `min(dutyOut − dutyIn, shiftOut − dutyIn)`, capped at **8 hours** (or 9 hours if lunch is added).
-- For **G and W1 shifts**, a 1-hour lunch deduction is applied by default. Enabling the **"Add Lunch"** toggle removes the deduction and raises the cap to 9 hours.
-- If actual punch span is < 30 minutes, duty hours are set to **0** (minimum threshold guard).
-- If punch-in and punch-out are < 60 minutes apart, the entire row is treated as a **zero-hour day**.
+* Net duty = `min(dutyOut − dutyIn, shiftOut − dutyIn)`, capped at **8 hours** (or 9 hours if lunch is added).
+* For **G and W1 shifts**, a 1-hour lunch deduction is applied by default. Enabling the **"Add Lunch"** toggle removes the deduction and raises the cap to 9 hours.
+* If actual punch span is < 30 minutes, duty hours are set to **0** (minimum threshold guard).
+* If punch-in and punch-out are < 60 minutes apart, the entire row is treated as a **zero-hour day**.
 
 ---
 
-### 🌙 C-Shift Overnight Handling
+### C-Shift Overnight Handling
 
 The **C-Shift (22:00–06:00)** introduces a cross-date complication: the punch-out recorded in CLM on the next calendar day actually belongs to the previous night's shift. The tool handles this automatically:
 
-- **Presentee Reports:** After initial parsing, a post-processing pass groups entries by employee, sorts by date, and for each C-shift entry (punch-in ≥ 20:00), takes the next date's punch-out (if it's a morning time < 12:00) as the actual exit time. A `+1` badge is displayed in the table for these cross-date punch-outs.
-- **PiPo Reports:** C-shift detection happens during the punch-pair resolution phase — evening IN punches (≥ 20:00) are paired with the next calendar date's morning OUT punches (< 12:00). Consumed morning OUT times are excluded from regular (daytime) shift calculations.
+* **Presentee Reports**: After initial parsing, a post-processing pass groups entries by employee, sorts by date, and for each C-shift entry (punch-in ≥ 20:00), takes the next date's punch-out (if it's a morning time < 12:00) as the actual exit time. A `+1` badge is displayed in the table for these cross-date punch-outs.
+* **PiPo Reports**: C-shift detection happens during the punch-pair resolution phase — evening IN punches (≥ 20:00) are paired with the next calendar date's morning OUT punches (< 12:00). Consumed morning OUT times are excluded from regular (daytime) shift calculations.
 
 ---
 
-### 🔎 Search & Filter
+### Search & Filter
 
 A **real-time search bar** filters the table by any combination of:
-- Employee Name
-- Safety Pass Number
-- Vendor Name
-- Assigned Shift
+* Employee Name
+* Safety Pass Number
+* Vendor Name
+* Assigned Shift
 
 ---
 
-### 📊 Aggregation Views
+### Aggregation Views
 
 Switch between three data views with a single click:
 
@@ -132,31 +129,33 @@ Switch between three data views with a single click:
 | **Employee Total** | Employee-wise aggregated total hours and equivalent shift count (`Total Hours ÷ 8`) |
 | **Skill Total** | Skill-wise aggregated total hours and equivalent shift count |
 
-An **"Close Aggregate View"** button returns to the main table.
+* An **"Close Aggregate View"** button returns to the main table.
 
 ---
 
-### 🔧 Column Picker
+### Column Picker
 
-A **Columns** dropdown lets users toggle the visibility of any of the 24 data columns on/off. Includes a **"Toggle All"** button to show/hide all columns at once. Column visibility is applied via dynamic CSS injection and only affects the main table view (not aggregate views).
+* A **Columns** dropdown lets users toggle the visibility of any of the 24 data columns on/off.
+* Includes a **"Toggle All"** button to show/hide all columns at once.
+* Column visibility is applied via dynamic CSS injection and only affects the main table view (not aggregate views).
 
 ---
 
-### 📊 Multi-Column Sorting
+### Multi-Column Sorting
 
 Click any sortable column header to cycle through **ascending → descending → unsorted** states. Sortable columns include:
-- Date
-- Name
-- Skill
-- Designation
-- Shifts Allowed
-- Shift
+* Date
+* Name
+* Skill
+* Designation
+* Shifts Allowed
+* Shift
 
 Sort arrows (▲▼) visually indicate the current sort direction.
 
 ---
 
-### 📤 One-Click XLSX Export
+### One-Click XLSX Export
 
 Export all processed data to a **multi-sheet Excel file** (`Calculated_Working_Hours.xlsx`) containing:
 1. **AttendanceData** — Full row-level processed attendance records
@@ -165,11 +164,11 @@ Export all processed data to a **multi-sheet Excel file** (`Calculated_Working_H
 
 ---
 
-### 🔄 Lunch Hour Toggle
+### Lunch Hour Toggle
 
 The **"Add Lunch"** checkbox recalculates all hours in real-time:
-- **Unchecked (default):** 1-hour lunch deduction is applied for G and W1 shifts; max duty = 8 hours.
-- **Checked:** No lunch deduction; max duty = 9 hours.
+* **Unchecked (default):** 1-hour lunch deduction is applied for G and W1 shifts; max duty = 8 hours.
+* **Checked:** No lunch deduction; max duty = 9 hours.
 
 Toggling triggers a full reprocessing of all `employeeData` rows without requiring re-upload.
 
@@ -191,13 +190,13 @@ These defaults are overridden if a master sheet with a `shift_definitions` sheet
 
 ### Edge Cases Handled
 
-- If a **shift is not defined** or the employee is **not in the master data**, the best shift is auto-assigned from the full shift definition table based on punch-time proximity.
-- If the employee **is in the master data**, the shift is assigned from among their allowed shifts.
-- **Unexpected shift assignments** (assigned shift not in the employee's allowed shifts list) are visually flagged in the table with a distinct CSS class.
-- **Cross-midnight shifts** (C-shift) are handled with wrap-around arithmetic for time differences.
-- **Excel time formats** (fractional day numbers, `HH:MM`, `HH:MM:SS`, `HH.MM`, `h AM/PM`) are all normalised automatically.
-- **Excel serial date numbers** in PiPo files are converted to readable date strings.
-- **Minimum punch span guard:** Punch pairs < 60 minutes apart are treated as zero-hour entries to prevent false shift assignments.
+* If a **shift is not defined** or the employee is **not in the master data**, the best shift is auto-assigned from the full shift definition table based on punch-time proximity.
+* If the employee **is in the master data**, the shift is assigned from among their allowed shifts.
+* **Unexpected shift assignments** (assigned shift not in the employee's allowed shifts list) are visually flagged in the table with a distinct CSS class.
+* **Cross-midnight shifts** (C-shift) are handled with wrap-around arithmetic for time differences.
+* **Excel time formats** (fractional day numbers, `HH:MM`, `HH:MM:SS`, `HH.MM`, `h AM/PM`) are all normalised automatically.
+* **Excel serial date numbers** in PiPo files are converted to readable date strings.
+* **Minimum punch span guard:** Punch pairs < 60 minutes apart are treated as zero-hour entries to prevent false shift assignments.
 
 ---
 
@@ -241,7 +240,7 @@ These defaults are overridden if a master sheet with a `shift_definitions` sheet
 
 ## Getting Started
 
-1. Open the [live link](https://alqamah.github.io/TSL---FMM-I-CG-AutomatedAttendanceBillingEngine/src/index.html) or serve locally via any static file server.
+1. Open the [live link](https://alqamah.github.io/TSL---Attendance_Reconciliation_Automation/src/index.html) or serve locally via any static file server.
 2. **(Optional)** Upload a **Master Sheet** in Step 1, or check **Bypass Master-Sheet** to skip.
 3. Upload one or more **CLM Presentee** or **Punch-In/Punch-Out** report Excel files in Step 2.
 4. View the processed attendance data in the table. Use the search bar, column picker, and sort headers to explore.
