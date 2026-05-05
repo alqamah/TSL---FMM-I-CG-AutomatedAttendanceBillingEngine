@@ -22,11 +22,13 @@ async function handlePipoFileSelect(event) {
 
         fileCountBadge.textContent = `${files.length} File${files.length > 1 ? 's' : ''}`;
 
+        const globalTempMap = {};
+
         for (const file of files) {
-            await processPipoFile(file);
+            await processPipoFile(file, globalTempMap);
         }
 
-        _mergeDuplicatePipoRows();
+        _finalizePipoProcessing(globalTempMap);
 
         renderTable();
 
@@ -83,58 +85,198 @@ function _recalculateEmployeeRow(row) {
 }
 
 /**
- * PiPo uploads can contain overlapping files. Collapse duplicate employee/date
- * rows into one row by keeping the earliest punch-in and latest punch-out.
+ * PiPo uploads can contain overlapping files. Collapse all uploaded punches into
+ * employee/date groups, then resolve C-shift exits from the next calendar date.
  */
-function _mergeDuplicatePipoRows() {
-    const byEmployeeDate = new Map();
+function _finalizePipoProcessing(globalTempMap) {
+    // --- 4. Resolve punch pairs, handling C-shift overnight boundaries ---
+    const _monthIdx = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+    const _parsePipoDate = ds => {
+        const parts = ds.split(/[-\/\.]/);
+        if (parts.length >= 3) {
+            const day = parseInt(parts[0], 10);
+            let mon = parseInt(parts[1], 10);
+            if (isNaN(mon)) {
+                mon = _monthIdx[(parts[1] || '').toLowerCase()] || 0;
+            } else {
+                mon = mon - 1; // Convert 1-12 to 0-11
+            }
+            let yr = parseInt(parts[2], 10);
+            if (yr < 100) yr += 2000;
+            return new Date(yr, mon, day).getTime();
+        }
+        return 0;
+    };
 
-    employeeData.forEach(row => {
-        const key = `${row.sp_no || ''}||${row.date || ''}`;
-        if (!byEmployeeDate.has(key)) byEmployeeDate.set(key, []);
-        byEmployeeDate.get(key).push(row);
+    const C_SHIFT_IN_THRESHOLD       = 20 * 60;  // 20:00 = 1200 min - evening IN signals C-shift
+    const EARLY_C_SHIFT_IN_THRESHOLD = 18 * 60;  // C-shift can be punched early before 20:00
+    const MORNING_OUT_CUTOFF         = 12 * 60;  // 12:00 = 720 min - morning OUT belongs to prev C-shift
+
+    // Group per-date records by employee for cross-date resolution
+    const byEmployee = {};
+    Object.values(globalTempMap).forEach(g => {
+        if (!byEmployee[g.sp_no]) byEmployee[g.sp_no] = [];
+        byEmployee[g.sp_no].push(g);
     });
 
-    const mergedRows = [];
+    const pipoEmployeeDetails = [];
 
-    byEmployeeDate.forEach(rows => {
-        if (rows.length === 1) {
-            mergedRows.push(rows[0]);
-            return;
-        }
+    Object.values(byEmployee).forEach(groups => {
+        // Sort this employee's date-groups chronologically
+        groups.sort((a, b) => _parsePipoDate(a.date) - _parsePipoDate(b.date));
 
-        const target = rows[0];
-        const inCandidates = rows
-            .map(row => parseTimeFormatToMinutes(row.punchIn))
-            .filter(mins => mins !== null);
+        // Track the IN punch already used to create each C-shift row.
+        const cPunchInsByGroup = new Map();
 
-        if (inCandidates.length > 0) {
-            const earliestIn = Math.min(...inCandidates);
-            target.punchIn = formatMinutesTo24h(earliestIn);
+        // First pass: identify C-shift entries and consume next-date morning OUTs
+        groups.forEach((group, idx) => {
+            const sameDateMorningOuts = group.outTimes.filter(m => m < MORNING_OUT_CUTOFF);
+            const nextGroup = groups[idx + 1];
+            const nextDateMorningOuts = nextGroup
+                ? nextGroup.outTimes.filter(m => m < MORNING_OUT_CUTOFF)
+                : [];
 
-            let latestOut = null;
-            let latestOutNextDate = null;
-
-            rows.forEach(row => {
-                const outMins = parseTimeFormatToMinutes(row.punchOut);
-                if (outMins === null) return;
-
-                const comparableOut = (row.punchOutNextDate || outMins < earliestIn) ? outMins + 1440 : outMins;
-                if (latestOut === null || comparableOut > latestOut) {
-                    latestOut = comparableOut;
-                    latestOutNextDate = row.punchOutNextDate || null;
-                }
+            const eveningIns = group.inTimes.filter(m => {
+                if (m >= C_SHIFT_IN_THRESHOLD) return true;
+                return (
+                    m >= EARLY_C_SHIFT_IN_THRESHOLD &&
+                    (sameDateMorningOuts.length > 0 || nextDateMorningOuts.length > 0)
+                );
             });
 
-            target.punchOut = latestOut !== null ? formatMinutesTo24h(latestOut % 1440) : '';
-            target.punchOutNextDate = latestOutNextDate;
-            _recalculateEmployeeRow(target);
-        }
+            if (eveningIns.length > 0) {
+                // This date has a C-shift start
+                const punchInMins = Math.min(...eveningIns);
+                let punchOutMins = null;
+                cPunchInsByGroup.set(idx, new Set(eveningIns));
 
-        mergedRows.push(target);
+                // Look for morning OUT on the NEXT date for this employee
+                if (nextDateMorningOuts.length > 0) {
+                    punchOutMins = Math.max(...nextDateMorningOuts);
+                }
+
+                pipoEmployeeDetails.push({
+                    date: group.date, sp_no: group.sp_no,
+                    punchInMins, punchOutMins,
+                    punchOutNextDate: (punchOutMins !== null && nextGroup) ? nextGroup.date : null,
+                    shiftOverride: 'C',
+                    vendorName: group.vendor_name, workorderNo: group.workorder_no,
+                    workmanName: group.workman_name, deptName: group.dept_name
+                });
+            }
+        });
+
+        // Second pass: regular (non-C) shift entries
+        groups.forEach((group, idx) => {
+            const cPunchIns = cPunchInsByGroup.get(idx);
+            const regularIns = group.inTimes.filter(m => !cPunchIns || !cPunchIns.has(m));
+
+            // Morning OUTs are C-shift exits, either already consumed by the previous
+            // date's C row or belonging to a previous upload not present here.
+            let availableOuts = group.outTimes.filter(m => m >= MORNING_OUT_CUTOFF);
+
+            // If no daytime IN and no available OUT, skip this day
+            if (regularIns.length === 0 && availableOuts.length === 0) return;
+
+            const punchInMins = regularIns.length > 0 ? Math.min(...regularIns) : null;
+            const punchOutMins = availableOuts.length > 0 ? Math.max(...availableOuts) : null;
+
+            pipoEmployeeDetails.push({
+                date: group.date, sp_no: group.sp_no,
+                punchInMins, punchOutMins,
+                vendorName: group.vendor_name, workorderNo: group.workorder_no,
+                workmanName: group.workman_name, deptName: group.dept_name
+            });
+        });
     });
 
-    employeeData = mergedRows;
+    // Sort final results by date for consistent output
+    pipoEmployeeDetails.sort((a, b) => _parsePipoDate(a.date) - _parsePipoDate(b.date));
+
+    console.log('pipoEmployeeDetails:', pipoEmployeeDetails);
+
+    // --- 5. Convert to unified employeeData rows ---
+    const addLunch    = addLunchCheckbox ? addLunchCheckbox.checked : false;
+    const processedRows = [];
+
+    pipoEmployeeDetails.forEach(emp => {
+        // Minutes since midnight → HH:MM string
+        const inTime  = emp.punchInMins  !== null ? formatMinutesTo24h(emp.punchInMins)  : '';
+        const outTime = emp.punchOutMins !== null ? formatMinutesTo24h(emp.punchOutMins) : '';
+
+        const normalizedDate = emp.date ? normalizeDate(emp.date) : '';
+
+        // Enrich from master-sheet employee data (if uploaded and not bypassed)
+        let skillVal         = null;
+        let designationVal   = null;
+        let shiftsAllowedVal = [];
+        let inOtAllowed      = false;
+        let outOtAllowed     = false;
+        let nameVal          = emp.workmanName || '';  // default from CLM punch data
+
+        const bypassMaster = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
+        if (masterFileUploaded && !bypassMaster) {
+            const empDetails = masterEmployeeDetails.find(e => e.sp_no === emp.sp_no);
+            if (empDetails) {
+                skillVal         = empDetails.skill         || null;
+                designationVal   = empDetails.designation   || null;
+                shiftsAllowedVal = empDetails.allowedShifts || [];
+                inOtAllowed      = !!empDetails.inOtAllowed;
+                outOtAllowed     = !!empDetails.outOtAllowed;
+                nameVal          = empDetails.name          || nameVal;
+            }
+        }
+
+        // Shift assignment
+        const shift = emp.shiftOverride || assignShift(emp.sp_no, inTime, outTime);
+        let shiftIn = '', shiftOut = '';
+        let shiftInMins = null, shiftOutMins = null;
+
+        if (shift && SHIFT_DEFINITIONS[shift]) {
+            shiftIn      = SHIFT_DEFINITIONS[shift].shiftIn;
+            shiftOut     = SHIFT_DEFINITIONS[shift].shiftOut;
+            shiftInMins  = parseTimeFormatToMinutes(shiftIn);
+            shiftOutMins = parseTimeFormatToMinutes(shiftOut);
+        }
+
+        // Hours calculation
+        const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
+        const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
+        const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
+
+        const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
+        const otHours    = calculateOtHours(emp.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
+        const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
+
+        processedRows.push({
+            date:          normalizedDate,
+            sp_no:         emp.sp_no,
+            name:          nameVal,
+            vendor_name:   emp.vendorName   || '',
+            workorder_no:  emp.workorderNo  || '',
+            dept_name:     emp.deptName      || '',
+            section:       '',
+            skill:         skillVal,
+            inOT:          inOtAllowed,
+            outOT:         outOtAllowed,
+            designation:   designationVal,
+            shiftsAllowed: shiftsAllowedVal,
+            shift,
+            shiftIn,
+            shiftOut,
+            punchIn:       inTime,
+            punchOut:      outTime,
+            punchOutNextDate: emp.punchOutNextDate || null,
+            dutyIn:        formattedDutyIn,
+            dutyOut:       formattedDutyOut,
+            addLunch,
+            dutyHours:     parseFloat(dutyHours.toFixed(2)),
+            otHours:       parseFloat(otHours.toFixed(2)),
+            totalHours
+        });
+    });
+
+    employeeData = employeeData.concat(processedRows);
 }
 
 /**
@@ -462,7 +604,7 @@ async function processPresenteeFile(file) {
  * - Takes the earliest IN and latest OUT punch for each employee per day.
  * - Maps results into the unified employeeData structure.
  */
-async function processPipoFile(file) {
+async function processPipoFile(file, globalTempMap) {
     const statusItem = document.createElement('li');
     statusItem.className = 'status-item';
     statusItem.innerHTML = `
@@ -505,7 +647,7 @@ async function processPipoFile(file) {
         const dataRows = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex, defval: '' });
 
         // --- 3. Group punch records by Safety Pass No + Date ---
-        const tempMap = {};
+        const tempMap = globalTempMap;
 
         dataRows.forEach(row => {
             let date = row['Date'] || '';
@@ -557,187 +699,7 @@ async function processPipoFile(file) {
             else if (flag === 'OUT') tempMap[groupKey].outTimes.push(timeMins);
         });
 
-        console.log('tempMap (per employee+date):', tempMap);
-
-        // --- 4. Resolve punch pairs, handling C-shift overnight boundaries ---
-        // Helper: parse date strings like "1-Apr-26" or "4/Apr/26" into sortable timestamps
-        const _monthIdx = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
-        const _parsePipoDate = ds => {
-            const parts = ds.split(/[-\/\.]/);
-            if (parts.length >= 3) {
-                const day = parseInt(parts[0], 10);
-                let mon = parseInt(parts[1], 10);
-                if (isNaN(mon)) {
-                    mon = _monthIdx[(parts[1] || '').toLowerCase()] || 0;
-                } else {
-                    mon = mon - 1; // Convert 1-12 to 0-11
-                }
-                let yr = parseInt(parts[2], 10);
-                if (yr < 100) yr += 2000;
-                return new Date(yr, mon, day).getTime();
-            }
-            return 0;
-        };
-
-        const C_SHIFT_IN_THRESHOLD = 20 * 60;  // 20:00 = 1200 min — evening IN signals C-shift
-        const MORNING_OUT_CUTOFF   = 12 * 60;  // 12:00 = 720 min  — morning OUT belongs to prev C-shift
-
-        // Group per-date records by employee for cross-date resolution
-        const byEmployee = {};
-        Object.values(tempMap).forEach(g => {
-            if (!byEmployee[g.sp_no]) byEmployee[g.sp_no] = [];
-            byEmployee[g.sp_no].push(g);
-        });
-
-        const pipoEmployeeDetails = [];
-
-        Object.values(byEmployee).forEach(groups => {
-            // Sort this employee's date-groups chronologically
-            groups.sort((a, b) => _parsePipoDate(a.date) - _parsePipoDate(b.date));
-
-            // Track which morning OUTs are "consumed" by a previous C-shift
-            const consumedMorningOuts = new Set(); // indices of groups whose morning OUTs were used
-
-            // First pass: identify C-shift entries and consume next-date morning OUTs
-            groups.forEach((group, idx) => {
-                const eveningIns = group.inTimes.filter(m => m >= C_SHIFT_IN_THRESHOLD);
-
-                if (eveningIns.length > 0) {
-                    // This date has a C-shift start
-                    const punchInMins = Math.min(...eveningIns);
-                    let punchOutMins = null;
-
-                    // Look for morning OUT on the NEXT date for this employee
-                    const nextGroup = groups[idx + 1];
-                    if (nextGroup) {
-                        const morningOuts = nextGroup.outTimes.filter(m => m < MORNING_OUT_CUTOFF);
-                        if (morningOuts.length > 0) {
-                            punchOutMins = Math.max(...morningOuts);
-                            consumedMorningOuts.add(idx + 1); // mark next date's morning OUTs as consumed
-                        }
-                    }
-
-                    pipoEmployeeDetails.push({
-                        date: group.date, sp_no: group.sp_no,
-                        punchInMins, punchOutMins,
-                        punchOutNextDate: (punchOutMins !== null && nextGroup) ? nextGroup.date : null,
-                        vendorName: group.vendor_name, workorderNo: group.workorder_no,
-                        workmanName: group.workman_name, deptName: group.dept_name
-                    });
-                }
-            });
-
-            // Second pass: regular (non-C) shift entries
-            groups.forEach((group, idx) => {
-                const regularIns = group.inTimes.filter(m => m < C_SHIFT_IN_THRESHOLD);
-                if (regularIns.length === 0) return; // no daytime IN → skip (C-shift only day)
-
-                const punchInMins = Math.min(...regularIns);
-
-                // Exclude morning OUTs if they were consumed by the previous C-shift
-                let availableOuts = group.outTimes;
-                if (consumedMorningOuts.has(idx)) {
-                    availableOuts = availableOuts.filter(m => m >= MORNING_OUT_CUTOFF);
-                }
-
-                const punchOutMins = availableOuts.length > 0 ? Math.max(...availableOuts) : null;
-
-                pipoEmployeeDetails.push({
-                    date: group.date, sp_no: group.sp_no,
-                    punchInMins, punchOutMins,
-                    vendorName: group.vendor_name, workorderNo: group.workorder_no,
-                    workmanName: group.workman_name, deptName: group.dept_name
-                });
-            });
-        });
-
-        // Sort final results by date for consistent output
-        pipoEmployeeDetails.sort((a, b) => _parsePipoDate(a.date) - _parsePipoDate(b.date));
-
-        console.log('pipoEmployeeDetails:', pipoEmployeeDetails);
-
-        // --- 5. Convert to unified employeeData rows ---
-        const addLunch    = addLunchCheckbox ? addLunchCheckbox.checked : false;
-        const processedRows = [];
-
-        pipoEmployeeDetails.forEach(emp => {
-            // Minutes since midnight → HH:MM string
-            const inTime  = emp.punchInMins  !== null ? formatMinutesTo24h(emp.punchInMins)  : '';
-            const outTime = emp.punchOutMins !== null ? formatMinutesTo24h(emp.punchOutMins) : '';
-
-            const normalizedDate = emp.date ? normalizeDate(emp.date) : '';
-
-            // Enrich from master-sheet employee data (if uploaded and not bypassed)
-            let skillVal         = null;
-            let designationVal   = null;
-            let shiftsAllowedVal = [];
-            let inOtAllowed      = false;
-            let outOtAllowed     = false;
-            let nameVal          = emp.workmanName || '';  // default from CLM punch data
-
-            const bypassMaster = bypassMasterFileCheckbox ? bypassMasterFileCheckbox.checked : false;
-            if (masterFileUploaded && !bypassMaster) {
-                const empDetails = masterEmployeeDetails.find(e => e.sp_no === emp.sp_no);
-                if (empDetails) {
-                    skillVal         = empDetails.skill         || null;
-                    designationVal   = empDetails.designation   || null;
-                    shiftsAllowedVal = empDetails.allowedShifts || [];
-                    inOtAllowed      = !!empDetails.inOtAllowed;
-                    outOtAllowed     = !!empDetails.outOtAllowed;
-                    nameVal          = empDetails.name          || nameVal;
-                }
-            }
-
-            // Shift assignment
-            const shift = assignShift(emp.sp_no, inTime, outTime);
-            let shiftIn = '', shiftOut = '';
-            let shiftInMins = null, shiftOutMins = null;
-
-            if (shift && SHIFT_DEFINITIONS[shift]) {
-                shiftIn      = SHIFT_DEFINITIONS[shift].shiftIn;
-                shiftOut     = SHIFT_DEFINITIONS[shift].shiftOut;
-                shiftInMins  = parseTimeFormatToMinutes(shiftIn);
-                shiftOutMins = parseTimeFormatToMinutes(shiftOut);
-            }
-
-            // Hours calculation
-            const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
-            const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
-            const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
-
-            const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
-            const otHours    = calculateOtHours(emp.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
-            const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
-
-            processedRows.push({
-                date:          normalizedDate,
-                sp_no:         emp.sp_no,
-                name:          nameVal,
-                vendor_name:   emp.vendorName   || '',
-                workorder_no:  emp.workorderNo  || '',
-                dept_name:     emp.deptName      || '',
-                section:       '',
-                skill:         skillVal,
-                inOT:          inOtAllowed,
-                outOT:         outOtAllowed,
-                designation:   designationVal,
-                shiftsAllowed: shiftsAllowedVal,
-                shift,
-                shiftIn,
-                shiftOut,
-                punchIn:       inTime,
-                punchOut:      outTime,
-                punchOutNextDate: emp.punchOutNextDate || null,
-                dutyIn:        formattedDutyIn,
-                dutyOut:       formattedDutyOut,
-                addLunch,
-                dutyHours:     parseFloat(dutyHours.toFixed(2)),
-                otHours:       parseFloat(otHours.toFixed(2)),
-                totalHours
-            });
-        });
-
-        employeeData = employeeData.concat(processedRows);
+        console.log('Appended to globalTempMap for file:', file.name);
 
         statusItem.classList.add('success');
         statusItem.querySelector('.status-text').textContent = '';
