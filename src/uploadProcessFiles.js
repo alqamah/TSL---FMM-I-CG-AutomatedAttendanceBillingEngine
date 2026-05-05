@@ -143,7 +143,7 @@ function _mergeDuplicatePipoRows() {
 function _parseDateForCShift(ds) {
     if (!ds) return 0;
     const monthNames = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
-    const parts = ds.split(/[-\/]/);
+    const parts = ds.split(/[-\/\.]/);
     if (parts.length >= 3) {
         const day = parseInt(parts[0], 10);
         let mon = parseInt(parts[1], 10);
@@ -563,10 +563,15 @@ async function processPipoFile(file) {
         // Helper: parse date strings like "1-Apr-26" or "4/Apr/26" into sortable timestamps
         const _monthIdx = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
         const _parsePipoDate = ds => {
-            const parts = ds.split(/[-\/]/);
+            const parts = ds.split(/[-\/\.]/);
             if (parts.length >= 3) {
                 const day = parseInt(parts[0], 10);
-                const mon = _monthIdx[(parts[1] || '').toLowerCase()] || 0;
+                let mon = parseInt(parts[1], 10);
+                if (isNaN(mon)) {
+                    mon = _monthIdx[(parts[1] || '').toLowerCase()] || 0;
+                } else {
+                    mon = mon - 1; // Convert 1-12 to 0-11
+                }
                 let yr = parseInt(parts[2], 10);
                 if (yr < 100) yr += 2000;
                 return new Date(yr, mon, day).getTime();

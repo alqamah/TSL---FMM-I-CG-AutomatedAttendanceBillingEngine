@@ -53,9 +53,9 @@ function normalizeDate(dateStr) {
     try {
         if (!dateStr) return 'N/A';
 
-        let clean = dateStr.replace(/\//g, '-').trim();
+        let clean = dateStr.replace(/[\\/\\.]/g, '-').trim();
 
-        const strictMatch = clean.match(/(\d{1,2}[-\s/]\d{1,2}[-\s/]\d{2,4})/);
+        const strictMatch = clean.match(/(\d{1,2}[-\s/.]\d{1,2}[-\s/.]\d{2,4})/);
         if (strictMatch) {
             clean = strictMatch[1].replace(/\s+/g, '-');
         }
@@ -73,11 +73,16 @@ function normalizeDate(dateStr) {
 function parseSortableDate(dateStr) {
     try {
         if (!dateStr || dateStr === 'N/A') return 0;
-        const parts = dateStr.split(/[-\/]/);
+        const parts = dateStr.split(/[-\/\.]/);
         if (parts.length === 3) {
             const day   = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10) - 1;
-            const year  = parseInt(parts[2], 10);
+            let month = parseInt(parts[1], 10) - 1;
+            if (isNaN(month)) {
+                const monthNames = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
+                month = monthNames[(parts[1] || '').toLowerCase()] || 0;
+            }
+            let year  = parseInt(parts[2], 10);
+            if (year < 100) year += 2000;
             return new Date(year, month, day).getTime();
         }
         return 0;
