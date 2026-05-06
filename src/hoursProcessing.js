@@ -196,8 +196,19 @@ function calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shiftStr, add
     if (dutyInMins === null || dutyOutMins === null) return 0;
 
     let diffMins = dutyOutMins - dutyInMins;
-    if (dutyOutMins < dutyInMins) diffMins += 1440;
+    let actualOut = dutyOutMins;
+    if (dutyOutMins < dutyInMins) {
+        diffMins += 1440;
+        actualOut += 1440;
+    }
     if (diffMins < 0) diffMins = 0;
+
+    if (!addLunch) {
+        // Calculate overlap with 12:00 PM (720 mins) to 1:00 PM (780 mins)
+        let overlap1 = Math.max(0, Math.min(actualOut, 780) - Math.max(dutyInMins, 720));
+        let overlap2 = Math.max(0, Math.min(actualOut, 780 + 1440) - Math.max(dutyInMins, 720 + 1440));
+        diffMins -= (overlap1 + overlap2);
+    }
 
     if (diffMins < 30) return 0;
 
