@@ -190,40 +190,18 @@ function calculateHours(inTimeStr, outTimeStr, shiftInStr, shiftOutStr, allowedO
 }
 
 /**
- * Calculates net duty hours from duty-in/out, honouring max-duty caps and lunch deduction.
+ * Calculates duty hours directly from duty-in/out.
  */
 function calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shiftStr, addLunch) {
     if (dutyInMins === null || dutyOutMins === null) return 0;
 
-    const endMins = shiftOutMins !== null ? shiftOutMins : dutyOutMins;
-
-    let diffActual = dutyOutMins - dutyInMins;
-    if (dutyOutMins < dutyInMins) diffActual += 1440;
-
-    let diffShift = endMins - dutyInMins;
-    if (endMins < dutyInMins) diffShift += 1440;
-
-    let diffMins = Math.min(diffActual, diffShift);
+    let diffMins = dutyOutMins - dutyInMins;
+    if (dutyOutMins < dutyInMins) diffMins += 1440;
     if (diffMins < 0) diffMins = 0;
 
-    let totalHours = diffMins / 60;
-    let maxDuty    = 8;
+    if (diffMins < 30) return 0;
 
-    if (shiftStr === 'G' || shiftStr === 'W1') {
-        if (!addLunch) {
-            totalHours = Math.max(0, totalHours - 1); // deduct 1-hour lunch break
-        } else {
-            maxDuty = 9;
-        }
-    }
-
-    let dutyHours = Math.min(maxDuty, totalHours);
-
-    if (diffActual < 30) {
-        dutyHours = 0;
-    }
-
-    return dutyHours;
+    return diffMins / 60;
 }
 
 /**
