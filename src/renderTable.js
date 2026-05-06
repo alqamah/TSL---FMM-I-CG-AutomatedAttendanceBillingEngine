@@ -134,7 +134,9 @@ function renderTable() {
 
         filteredData.forEach((row, index) => {
             const tr = document.createElement('tr');
-            const isUnexpectedShift = row.shiftsAllowed && !row.shiftsAllowed.includes(row.shift);
+            const normalizedAssignedShift = String(row.shift || '').trim().toUpperCase();
+            const normalizedAllowedShifts = (row.shiftsAllowed || []).map(shift => String(shift || '').trim().toUpperCase());
+            const isUnexpectedShift = normalizedAllowedShifts.length > 0 && !normalizedAllowedShifts.includes(normalizedAssignedShift);
             tr.innerHTML = `
                 <td>${index + 1}</td>
                 <td title="date">${row.date || ''}</td>

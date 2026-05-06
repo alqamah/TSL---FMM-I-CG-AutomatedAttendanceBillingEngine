@@ -179,7 +179,7 @@ async function handleMasterFileUpload(event) {
 
         // ---- Sheet 1: employee_details ----
         const empSheetName = workbook.SheetNames.find(n =>
-            n.toLowerCase().replace(/\s/g, '') === 'employeedetails'
+            n.toLowerCase().replace(/[\s_\-]/g, '') === 'employeedetails'
         ) || workbook.SheetNames[0];
 
         if (!empSheetName) throw new Error('Could not locate "employee_details" sheet (Sheet 1).');
@@ -190,7 +190,7 @@ async function handleMasterFileUpload(event) {
 
         // ---- Sheet 2: shift_definitions (optional) ----
         const shiftSheetName = workbook.SheetNames.find(n =>
-            n.toLowerCase().replace(/\s/g, '') === 'shiftdefinitions'
+            n.toLowerCase().replace(/[\s_\-]/g, '') === 'shiftdefinitions'
         ) || workbook.SheetNames[1];
 
         let parsedShifts = {};

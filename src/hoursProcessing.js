@@ -271,116 +271,198 @@ function calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dut
 // SHIFT ASSIGNMENT
 // -----------------------------------------------
 
+function _normalizeShiftKey(shiftKey) {
+    return String(shiftKey || '').trim().toUpperCase();
+}
+
+function _resolveShiftDefinitionKey(shiftKey) {
+    const rawKey = String(shiftKey || '').trim();
+    if (!rawKey) return '';
+    const shiftDefinitions = _getActiveShiftDefinitions();
+    if (shiftDefinitions[rawKey]) return rawKey;
+
+    const normalizedKey = _normalizeShiftKey(rawKey);
+    return Object.keys(shiftDefinitions).find(key => _normalizeShiftKey(key) === normalizedKey) || rawKey;
+}
+
+function _getActiveShiftDefinitions() {
+    const hasUploadedMaster = typeof masterFileUploaded !== 'undefined' && masterFileUploaded;
+    if (!hasUploadedMaster && typeof DEFAULT_SHIFT_DEFINITIONS !== 'undefined') {
+        return DEFAULT_SHIFT_DEFINITIONS;
+    }
+
+    return SHIFT_DEFINITIONS;
+}
+
+function _getDefaultShiftDefinitions() {
+    if (typeof DEFAULT_SHIFT_DEFINITIONS !== 'undefined') {
+        return DEFAULT_SHIFT_DEFINITIONS;
+    }
+
+    return SHIFT_DEFINITIONS;
+}
+
+function _getEmployeeMasterDetails(employeeId) {
+    if (typeof masterEmployeeDetails === 'undefined' || !Array.isArray(masterEmployeeDetails)) {
+        return null;
+    }
+
+    const targetId = String(employeeId || '').trim();
+    return masterEmployeeDetails.find(e => String(e.sp_no || '').trim() === targetId) || null;
+}
+
+function _getShiftCandidatesForEmployee(employeeId) {
+    const shiftDefinitions = _getActiveShiftDefinitions();
+    const empDetails = _getEmployeeMasterDetails(employeeId);
+    const allowedShifts = empDetails && Array.isArray(empDetails.allowedShifts)
+        ? empDetails.allowedShifts
+        : [];
+
+    if (allowedShifts.length > 0) {
+        const seen = new Set();
+        const resolvedAllowed = [];
+
+        allowedShifts.forEach(shiftKey => {
+            const resolvedKey = _resolveShiftDefinitionKey(shiftKey);
+            if (!shiftDefinitions[resolvedKey]) return;
+
+            const normalizedKey = _normalizeShiftKey(resolvedKey);
+            if (seen.has(normalizedKey)) return;
+
+            seen.add(normalizedKey);
+            resolvedAllowed.push(resolvedKey);
+        });
+
+        if (resolvedAllowed.length > 0) return resolvedAllowed;
+    }
+
+    return Object.keys(shiftDefinitions);
+}
+
+function _timeDiffMinutes(a, b) {
+    let d = Math.abs(a - b);
+    if (d > 720) d = 1440 - d;
+    return d;
+}
+
+function _estimateShiftOverlapMins(punchInMins, punchOutMins, shiftInMins, shiftOutMins) {
+    let actualIn = punchInMins;
+    let actualOut = punchOutMins;
+    let normalizedShiftOut = shiftOutMins;
+
+    if (actualIn === null || actualOut === null) {
+        let duration = normalizedShiftOut - shiftInMins;
+        if (duration < 0) duration += 1440;
+        return duration;
+    }
+
+    if (actualOut < actualIn) actualOut += 1440;
+    if (normalizedShiftOut < shiftInMins) normalizedShiftOut += 1440;
+
+    if (actualIn < shiftInMins - 720) actualIn += 1440;
+    if (actualIn > shiftInMins + 720) actualIn -= 1440;
+    if (actualOut < actualIn) actualOut += 1440;
+
+    return Math.max(0, Math.min(actualOut, normalizedShiftOut) - Math.max(actualIn, shiftInMins));
+}
+
+function _scoreShiftCandidate(shiftKey, punchInMins, punchOutMins, shiftDefinitions, enforceMatchWindow = true) {
+    const definitions = shiftDefinitions || _getActiveShiftDefinitions();
+    const def = definitions[shiftKey];
+    if (!def) return null;
+
+    const shiftInMins  = parseTimeFormatToMinutes(def.shiftIn);
+    const shiftOutMins = parseTimeFormatToMinutes(def.shiftOut);
+    if (shiftInMins === null || shiftOutMins === null) return null;
+
+    const diffs = [];
+    if (punchInMins  !== null) diffs.push(_timeDiffMinutes(punchInMins,  shiftInMins));
+    if (punchOutMins !== null) diffs.push(_timeDiffMinutes(punchOutMins, shiftOutMins));
+    if (diffs.length === 0) return null;
+
+    const avgDiff = diffs.reduce((sum, diff) => sum + diff, 0) / diffs.length;
+    const bestEdgeDiff = Math.min(...diffs);
+
+    if (enforceMatchWindow && avgDiff > 120 && bestEdgeDiff > 120) return null;
+
+    return {
+        shiftKey,
+        score: avgDiff,
+        overlapMins: _estimateShiftOverlapMins(punchInMins, punchOutMins, shiftInMins, shiftOutMins)
+    };
+}
+
+function isPunchInForOvernightShift(employeeId, punchIn) {
+    const punchInMins = punchIn ? parseTimeFormatToMinutes(punchIn) : null;
+    if (punchInMins === null) return false;
+
+    return _getShiftCandidatesForEmployee(employeeId).some(shiftKey => {
+        const def = _getActiveShiftDefinitions()[shiftKey];
+        if (!def) return false;
+
+        const shiftInMins  = parseTimeFormatToMinutes(def.shiftIn);
+        const shiftOutMins = parseTimeFormatToMinutes(def.shiftOut);
+        if (shiftInMins === null || shiftOutMins === null) return false;
+        if (shiftOutMins >= shiftInMins) return false;
+
+        return _timeDiffMinutes(punchInMins, shiftInMins) <= 180;
+    });
+}
+
+function _sortShiftCandidates(candidates) {
+    candidates.sort((a, b) => {
+        const scoreGap = Math.abs(a.score - b.score);
+        if (scoreGap <= 30) {
+            const overlapDiff = b.overlapMins - a.overlapMins;
+            if (overlapDiff !== 0) return overlapDiff;
+        }
+        return a.score - b.score;
+    });
+
+    return candidates;
+}
+
+function _getNearestDefaultShift(punchInMins, punchOutMins) {
+    const defaultDefinitions = _getDefaultShiftDefinitions();
+    const candidates = Object.keys(defaultDefinitions)
+        .map(shiftKey => _scoreShiftCandidate(shiftKey, punchInMins, punchOutMins, defaultDefinitions, false))
+        .filter(Boolean);
+
+    if (candidates.length === 0) return 'NA';
+
+    return _sortShiftCandidates(candidates)[0].shiftKey;
+}
+
 /**
  * Assigns the best matching shift key for an employee based on punch-in / punch-out times.
- * Priority: A/B/C shifts matched via punch-in proximity → fallback via punch-out proximity
- *           → G/W1 general shifts matched via combined proximity + estimated working hours.
+ * Uses the employee's uploaded master allowed shifts first. If no master file has
+ * been uploaded, candidates come from DEFAULT_SHIFT_DEFINITIONS in main.js.
  *
  * @returns {string} Shift key (e.g. 'A', 'B', 'C', 'G', 'W1', or 'NA')
  */
 function assignShift(employeeId, punchIn, punchOut) {
+    let punchInMins = null;
+    let punchOutMins = null;
+
     try {
-        const punchInMins  = punchIn  ? parseTimeFormatToMinutes(punchIn)  : null;
-        const punchOutMins = punchOut ? parseTimeFormatToMinutes(punchOut) : null;
+        punchInMins  = punchIn  ? parseTimeFormatToMinutes(punchIn)  : null;
+        punchOutMins = punchOut ? parseTimeFormatToMinutes(punchOut) : null;
 
-        const abcShifts = ['A', 'B', 'C'];
-        const gwShifts  = ['G', 'W1'];
+        const candidates = _getShiftCandidatesForEmployee(employeeId)
+            .map(shiftKey => _scoreShiftCandidate(shiftKey, punchInMins, punchOutMins))
+            .filter(Boolean);
 
-        let bestShift = 'NA';
-        let bestDiff  = Infinity;
-
-        // Midnight-aware absolute difference
-        function timeDiff(a, b) {
-            let d = Math.abs(a - b);
-            if (d > 720) d = 1440 - d;
-            return d;
+        if (candidates.length === 0) {
+            const fallbackShift = _getNearestDefaultShift(punchInMins, punchOutMins);
+            console.log(`assignShift: ${employeeId} -> punchIn=${punchIn}, punchOut=${punchOut}, assigned=${fallbackShift} (default fallback)`);
+            return fallbackShift;
         }
 
-        // Step 1a: Match A/B/C via punch-in proximity to shiftIn
-        if (punchInMins !== null) {
-            abcShifts.forEach(shiftKey => {
-                const def = SHIFT_DEFINITIONS[shiftKey];
-                if (!def) return;
-                const target = parseTimeFormatToMinutes(def.shiftIn);
-                if (target === null) return;
-
-                const diff = timeDiff(punchInMins, target);
-                if (diff <= 120 && diff < bestDiff) {
-                    bestDiff  = diff;
-                    bestShift = shiftKey;
-                }
-            });
-        }
-
-        // Step 1b: Fallback – match A/B/C via punch-out proximity to shiftOut
-        if (bestShift === 'NA' && punchOutMins !== null) {
-            abcShifts.forEach(shiftKey => {
-                const def = SHIFT_DEFINITIONS[shiftKey];
-                if (!def) return;
-                const target = parseTimeFormatToMinutes(def.shiftOut);
-                if (target === null) return;
-
-                const diff = timeDiff(punchOutMins, target);
-                if (diff <= 120 && diff < bestDiff) {
-                    bestDiff  = diff;
-                    bestShift = shiftKey;
-                }
-            });
-        }
-
-        // Step 2: Evaluate G/W1 via combined proximity + estimated working hours
-        const gwCandidates = [];
-        gwShifts.forEach(shiftKey => {
-            const def = SHIFT_DEFINITIONS[shiftKey];
-            if (!def) return;
-
-            const shiftInMins  = parseTimeFormatToMinutes(def.shiftIn);
-            const shiftOutMins = parseTimeFormatToMinutes(def.shiftOut);
-            if (shiftInMins === null || shiftOutMins === null) return;
-
-            let totalDiff  = 0;
-            let matchCount = 0;
-
-            if (punchInMins  !== null) { totalDiff += timeDiff(punchInMins,  shiftInMins);  matchCount++; }
-            if (punchOutMins !== null) { totalDiff += timeDiff(punchOutMins, shiftOutMins); matchCount++; }
-
-            if (matchCount > 0) {
-                const avgDiff = totalDiff / matchCount;
-                if (avgDiff <= 120) {
-                    const effectiveIn  = punchInMins  !== null ? Math.max(punchInMins,  shiftInMins)  : shiftInMins;
-                    const effectiveOut = punchOutMins !== null ? Math.min(punchOutMins, shiftOutMins) : shiftOutMins;
-                    let estMins = effectiveOut - effectiveIn;
-                    if (estMins < 0)    estMins += 1440;
-                    if (estMins > 720)  estMins = 0; // sanity cap
-
-                    gwCandidates.push({ shiftKey, avgDiff, estMins });
-                }
-            }
-        });
-
-        // Pick best G/W1: if proximity scores are within 30 min, prefer the higher-hours shift
-        if (gwCandidates.length > 0) {
-            gwCandidates.sort((a, b) => {
-                const diffGap = Math.abs(a.avgDiff - b.avgDiff);
-                if (diffGap <= 30) {
-                    const hoursDiff = b.estMins - a.estMins;
-                    if (hoursDiff !== 0) return hoursDiff;
-                    return a.avgDiff - b.avgDiff;
-                }
-                return a.avgDiff - b.avgDiff;
-            });
-
-            const topGw = gwCandidates[0];
-            if (topGw.avgDiff < bestDiff) {
-                bestDiff  = topGw.avgDiff;
-                bestShift = topGw.shiftKey;
-            }
-        }
-
-        console.log(`assignShift: ${employeeId} → punchIn=${punchIn}, punchOut=${punchOut}, assigned=${bestShift}`);
+        const bestShift = _sortShiftCandidates(candidates)[0].shiftKey;
+        console.log(`assignShift: ${employeeId} -> punchIn=${punchIn}, punchOut=${punchOut}, assigned=${bestShift}`);
         return bestShift;
     } catch (err) {
         console.error('assignShift error:', err);
-        return 'NA';
+        return _getNearestDefaultShift(punchInMins, punchOutMins);
     }
 }

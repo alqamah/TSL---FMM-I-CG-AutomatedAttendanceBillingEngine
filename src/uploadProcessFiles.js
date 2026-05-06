@@ -159,7 +159,6 @@ function _finalizePipoProcessing(globalTempMap) {
                     date: group.date, sp_no: group.sp_no,
                     punchInMins, punchOutMins,
                     punchOutNextDate: (punchOutMins !== null && nextGroup) ? nextGroup.date : null,
-                    shiftOverride: 'C',
                     vendorName: group.vendor_name, workorderNo: group.workorder_no,
                     workmanName: group.workman_name, deptName: group.dept_name
                 });
@@ -320,11 +319,17 @@ function _resolveCShiftCrossDate() {
         // Sort by date
         entries.sort((a, b) => _parseDateForCShift(a.row.date) - _parseDateForCShift(b.row.date));
 
-        // Identify C-shift entries (punchIn in minutes >= 20:00)
+        // Identify entries whose allowed shift crosses midnight.
         const cShiftIndices = [];
         entries.forEach((entry, pos) => {
             const inMins = parseTimeFormatToMinutes(entry.row.punchIn);
-            if (inMins !== null && inMins >= C_SHIFT_THRESHOLD_MINS) {
+            if (
+                inMins !== null &&
+                (
+                    isPunchInForOvernightShift(entry.row.sp_no, entry.row.punchIn) ||
+                    inMins >= C_SHIFT_THRESHOLD_MINS
+                )
+            ) {
                 cShiftIndices.push(pos);
             }
         });
