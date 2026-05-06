@@ -71,7 +71,7 @@ function _recalculateEmployeeRow(row) {
     }
 
     const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, row.inOT, row.outOT);
-    const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, row.addLunch);
+    const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, row.addLunch);
     const otHours    = calculateOtHours(row.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
 
     row.shift      = shift;
@@ -243,7 +243,7 @@ function _finalizePipoProcessing(globalTempMap) {
         const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
         const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
 
-        const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
+        const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, addLunch);
         const otHours    = calculateOtHours(emp.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
         const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
 
@@ -374,7 +374,7 @@ function _resolveCShiftCrossDate() {
             const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, currentRow.inOT, currentRow.outOT);
             const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
             const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
-            const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, currentRow.addLunch);
+            const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, currentRow.addLunch);
             const otHours    = calculateOtHours(currentRow.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
 
             currentRow.shift      = shift;
@@ -555,7 +555,7 @@ async function processPresenteeFile(file) {
                 const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
                 const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
 
-                const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, shift, addLunch);
+                const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, addLunch);
                 const otHours    = calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
                 const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
 

@@ -272,7 +272,7 @@ function reprocessData() {
 
                 const { dutyInMins, dutyOutMins } = calculateHours(punch_in, punch_out, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
 
-                const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftOutMins, row.shift, addLunch);
+                const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, row.shift, addLunch);
                 const otHours    = calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
                 const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
 
