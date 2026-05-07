@@ -423,7 +423,8 @@ async function handlePresenteeFileSelect(event) {
         }
 
         // Fix C-shift overnight punch-outs across dates
-        _resolveCShiftCrossDate();
+        // Removed as per requirement: Presentee Report data is already correct.
+        // _resolveCShiftCrossDate();
 
         renderTable();
 
