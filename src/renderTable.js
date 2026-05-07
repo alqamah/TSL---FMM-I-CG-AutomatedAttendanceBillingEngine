@@ -139,6 +139,7 @@ function renderTable() {
             const shiftDef = SHIFT_DEFINITIONS[row.shift];
             const deductLunch = shiftDef ? shiftDef.deductLunch : false;
             const deductLunchBadge = deductLunch ? '<sup class="deduct-lunch-badge" title="1h lunch deducted">-1</sup>' : '';
+            const totalHrsClass = row.totalHours === 0 ? 'highlight-hours zero-hours' : 'highlight-hours';
             tr.innerHTML = `
                 <td>${index + 1}</td>
                 <td title="date">${row.date || ''}</td>
@@ -146,7 +147,7 @@ function renderTable() {
                 <td title="name">${row.name || ''}</td>
                 <td title="punch-in">${row.punchIn || ''}</td>
                 <td title="${row.punchOutNextDate ? 'Punch-out on: ' + row.punchOutNextDate : 'punch-out'}" class="${row.punchOutNextDate ? 'next-day-out' : ''}">${row.punchOut || ''}${row.punchOutNextDate ? '<sup class="next-day-badge">+1</sup>' : ''}</td>
-                <td title="total-hrs" class="highlight-hours">${row.totalHours ?? ''}</td>
+                <td title="total-hrs" class="${totalHrsClass}">${row.totalHours ?? ''}</td>
                 <td title="duty-hrs">${row.dutyHours ?? ''}</td>
                 <td title="ot-hrs">${row.otHours ?? ''}</td>
                 <td title="shifts-allowed">${(row.shiftsAllowed || []).join(', ') || ''}</td>
@@ -205,7 +206,8 @@ function renderAggregatedTable(data, columns) {
             let rowHTML = '';
             columns.forEach(col => {
                 if (col === 'Total Hours' || col === 'Total Shifts') {
-                    rowHTML += `<td class="highlight-hours">${row[col]}</td>`;
+                    const extraClass = row[col] === 0 ? ' zero-hours' : '';
+                    rowHTML += `<td class="highlight-hours${extraClass}">${row[col]}</td>`;
                 } else {
                     rowHTML += `<td>${row[col]}</td>`;
                 }

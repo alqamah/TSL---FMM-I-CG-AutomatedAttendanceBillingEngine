@@ -775,6 +775,11 @@ tbody tr:nth-child(even) .highlight-hours {
     background: #f1f5f9;
 }
 
+.zero-hours {
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+}
+
 tbody td:nth-child(20) {
     max-width: 18ch;
     overflow: hidden;
