@@ -138,7 +138,7 @@ function renderTable() {
             const isUnexpectedShift = normalizedAllowedShifts.length > 0 && !normalizedAllowedShifts.includes(normalizedAssignedShift);
             const shiftDef = SHIFT_DEFINITIONS[row.shift];
             const deductLunch = shiftDef ? shiftDef.deductLunch : false;
-            const deductLunchBadge = deductLunch ? '<sup class="deduct-lunch-badge" title="1h Lunch Deducted">-1</sup>' : '';
+            const deductLunchBadge = deductLunch ? '<sup class="deduct-lunch-badge" title="1h lunch deducted">-1</sup>' : '';
             tr.innerHTML = `
                 <td>${index + 1}</td>
                 <td title="date">${row.date || ''}</td>
