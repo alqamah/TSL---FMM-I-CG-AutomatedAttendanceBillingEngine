@@ -807,6 +807,20 @@ tbody td:nth-child(20) {
     cursor: help;
 }
 
+.deduct-lunch-badge {
+    display: inline-block;
+    margin-left: 2px;
+    padding: 0 3px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #b91c1c;
+    background: #fee2e2;
+    border-radius: 3px;
+    vertical-align: super;
+    cursor: help;
+}
+
 .empty-state {
     display: flex;
     flex-direction: column;

@@ -85,7 +85,6 @@ let employeeData = [
         punchOut: from Uploaded file
         dutyIn: after calculateHours()
         dutyOut: after calculateHours()
-        addLunch: from addLunch button/flag
         dutyHours: from calculateHours()
         otHours: from calculateHours()
         otAllowed: {in:boolean, out:boolean}

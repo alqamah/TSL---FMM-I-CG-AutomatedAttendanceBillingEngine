@@ -71,7 +71,9 @@ function _recalculateEmployeeRow(row) {
     }
 
     const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, row.inOT, row.outOT);
-    const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, row.addLunch);
+    const shiftDef = SHIFT_DEFINITIONS[shift];
+    const deductLunch = shiftDef ? shiftDef.deductLunch : false;
+    const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, deductLunch);
     const otHours    = calculateOtHours(row.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
 
     row.shift      = shift;
@@ -195,7 +197,6 @@ function _finalizePipoProcessing(globalTempMap) {
     console.log('pipoEmployeeDetails:', pipoEmployeeDetails);
 
     // --- 5. Convert to unified employeeData rows ---
-    const addLunch    = addLunchCheckbox ? addLunchCheckbox.checked : false;
     const processedRows = [];
 
     pipoEmployeeDetails.forEach(emp => {
@@ -243,7 +244,9 @@ function _finalizePipoProcessing(globalTempMap) {
         const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
         const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
 
-        const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, addLunch);
+        const shiftDef = SHIFT_DEFINITIONS[shift];
+        const deductLunch = shiftDef ? shiftDef.deductLunch : false;
+        const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, deductLunch);
         const otHours    = calculateOtHours(emp.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
         const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
 
@@ -268,7 +271,6 @@ function _finalizePipoProcessing(globalTempMap) {
             punchOutNextDate: emp.punchOutNextDate || null,
             dutyIn:        formattedDutyIn,
             dutyOut:       formattedDutyOut,
-            addLunch,
             dutyHours:     parseFloat(dutyHours.toFixed(2)),
             otHours:       parseFloat(otHours.toFixed(2)),
             totalHours
@@ -374,7 +376,9 @@ function _resolveCShiftCrossDate() {
             const { dutyInMins, dutyOutMins } = calculateHours(inTime, outTime, shiftIn, shiftOut, currentRow.inOT, currentRow.outOT);
             const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
             const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
-            const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, currentRow.addLunch);
+            const shiftDef = SHIFT_DEFINITIONS[shift];
+            const deductLunch = shiftDef ? shiftDef.deductLunch : false;
+            const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, deductLunch);
             const otHours    = calculateOtHours(currentRow.sp_no, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
 
             currentRow.shift      = shift;
@@ -518,7 +522,6 @@ async function processPresenteeFile(file) {
                 const outTime  = outTimeRaw || (outMins !== null ? formatMinutesTo24h(outMins) : '');
 
                 const employeeId = String(row['Safety Pass No'] || '').trim();
-                const addLunch   = addLunchCheckbox ? addLunchCheckbox.checked : false;
 
                 // Enrich from master-sheet employee data (if uploaded and not bypassed)
                 let skillVal         = null;
@@ -556,7 +559,9 @@ async function processPresenteeFile(file) {
                 const formattedDutyIn  = dutyInMins  !== null ? formatMinutesTo24h(dutyInMins)  : '';
                 const formattedDutyOut = dutyOutMins !== null ? formatMinutesTo24h(dutyOutMins) : '';
 
-                const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, addLunch);
+                const shiftDef = SHIFT_DEFINITIONS[shift];
+                const deductLunch = shiftDef ? shiftDef.deductLunch : false;
+                const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shift, deductLunch);
                 const otHours    = calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
                 const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
 
@@ -580,7 +585,6 @@ async function processPresenteeFile(file) {
                     punchOut:      outTime,
                     dutyIn:        formattedDutyIn,
                     dutyOut:       formattedDutyOut,
-                    addLunch,
                     dutyHours:     parseFloat(dutyHours.toFixed(2)),
                     otHours:       parseFloat(otHours.toFixed(2)),
                     totalHours

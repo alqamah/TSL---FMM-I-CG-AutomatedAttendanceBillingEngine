@@ -138,8 +138,9 @@ function _parseShiftDefinitionsSheet(worksheet) {
 
         const shiftIn  = _excelTimeToHHMM(get('in')  || get('shiftin')  || '');
         const shiftOut = _excelTimeToHHMM(get('out') || get('shiftout') || '');
+        const deductLunch = _parseYesNo(get('deductlunch') || get('lunchdeduct') || false);
 
-        const entry = { shiftIn, shiftOut };
+        const entry = { shiftIn, shiftOut, deductLunch };
         defs[shiftName] = entry;
         console.log(`[Master] SHIFT_DEFINITIONS["${shiftName}"]:`, entry);
     });

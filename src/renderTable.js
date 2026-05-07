@@ -47,7 +47,6 @@ function renderTable() {
                     <th class="highlight-header">TOTAL HRS</th>
                     <th>DUTY HRS</th>
                     <th>OT HRS</th>
-                    <th>ADD LUNCH</th>
                     <th class="sortable-header">
                         <button class="sort-header-button" type="button" data-sort-key="shiftsAllowed" aria-label="Sort by allowed shifts">
                             SHIFTS ALLOWED ${sortArrowsHtml('shiftsAllowed')}
@@ -137,6 +136,9 @@ function renderTable() {
             const normalizedAssignedShift = String(row.shift || '').trim().toUpperCase();
             const normalizedAllowedShifts = (row.shiftsAllowed || []).map(shift => String(shift || '').trim().toUpperCase());
             const isUnexpectedShift = normalizedAllowedShifts.length > 0 && !normalizedAllowedShifts.includes(normalizedAssignedShift);
+            const shiftDef = SHIFT_DEFINITIONS[row.shift];
+            const deductLunch = shiftDef ? shiftDef.deductLunch : false;
+            const deductLunchBadge = deductLunch ? '<sup class="deduct-lunch-badge" title="1h Lunch Deducted">-1</sup>' : '';
             tr.innerHTML = `
                 <td>${index + 1}</td>
                 <td title="date">${row.date || ''}</td>
@@ -147,9 +149,8 @@ function renderTable() {
                 <td title="total-hrs" class="highlight-hours">${row.totalHours ?? ''}</td>
                 <td title="duty-hrs">${row.dutyHours ?? ''}</td>
                 <td title="ot-hrs">${row.otHours ?? ''}</td>
-                <td title="add-lunch">${row.addLunch ? 'Yes' : 'No'}</td>
                 <td title="shifts-allowed">${(row.shiftsAllowed || []).join(', ') || ''}</td>
-                <td title="${isUnexpectedShift ? 'Assigned shift is not in allowed shifts' : 'shift'}" class="${isUnexpectedShift ? 'flagged-shift' : ''}">${row.shift || ''}</td>
+                <td title="${isUnexpectedShift ? 'Assigned shift is not in allowed shifts' : 'shift'}" class="${isUnexpectedShift ? 'flagged-shift' : ''}">${row.shift || ''}${deductLunchBadge}</td>
                 <td title="shift-in">${row.shiftIn || ''}</td>
                 <td title="shift-out">${row.shiftOut || ''}</td>
                 <td title="duty-in">${row.dutyIn || ''}</td>

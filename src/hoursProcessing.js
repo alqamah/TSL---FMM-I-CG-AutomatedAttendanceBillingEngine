@@ -193,7 +193,7 @@ function calculateHours(inTimeStr, outTimeStr, shiftInStr, shiftOutStr, allowedO
  * Calculates duty hours directly from duty-in/out.
  * Clamps to the shift window (shiftIn → shiftOut) so OT is not double-counted.
  */
-function calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shiftStr, addLunch) {
+function calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, shiftStr, deductLunch = false) {
     if (dutyInMins === null || dutyOutMins === null) return 0;
 
     // Clamp duty span to the shift window so OT portions are excluded
@@ -228,11 +228,9 @@ function calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, 
     }
     if (diffMins < 0) diffMins = 0;
 
-    if (!addLunch && String(shiftStr).toUpperCase() !== 'A') {
-        // Calculate overlap with 12:00 PM (720 mins) to 1:00 PM (780 mins)
-        let overlap1 = Math.max(0, Math.min(actualOut, 780) - Math.max(effectiveIn, 720));
-        let overlap2 = Math.max(0, Math.min(actualOut, 780 + 1440) - Math.max(effectiveIn, 720 + 1440));
-        diffMins -= (overlap1 + overlap2);
+    if (deductLunch) {
+        diffMins -= 60;
+        if (diffMins < 0) diffMins = 0;
     }
 
     if (diffMins < 30) return 0;

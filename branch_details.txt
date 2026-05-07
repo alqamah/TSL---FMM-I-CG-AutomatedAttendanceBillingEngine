@@ -1,4 +1,4 @@
 separation of script.js
 uploading punch records and presentee report
-add-lunch logic implemented
+deduct-lunch logic removed
 cross-punch timing for C shift implemented for both presentee report and punch records. Rollback required for Presentee report.

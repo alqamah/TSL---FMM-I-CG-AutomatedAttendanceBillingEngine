@@ -15,7 +15,6 @@ const dataTable                   = document.getElementById('dataTable');
 const tableBody                   = document.getElementById('tableBody');
 const exportBtn                   = document.getElementById('exportBtn');
 const searchInput                 = document.getElementById('searchInput');
-const addLunchCheckbox            = document.getElementById('addLunchCheckbox');
 const bypassMasterFileCheckbox    = document.getElementById('bypassMasterFileCheckbox');
 const columnPickerBtn             = document.getElementById('columnPickerBtn');
 const columnPickerDropdown        = document.getElementById('columnPickerDropdown');
@@ -44,11 +43,11 @@ let masterEmployeeDetails = [];
  * or the master sheet does not contain a shift_definitions sheet.
  */
 const DEFAULT_SHIFT_DEFINITIONS = {
-    'A':  { shiftIn: '06:00', shiftOut: '14:00' },
-    'B':  { shiftIn: '14:00', shiftOut: '22:00' },
-    'C':  { shiftIn: '22:00', shiftOut: '06:00' },
-    'W1': { shiftIn: '08:30', shiftOut: '17:30' },
-    'G':  { shiftIn: '08:00', shiftOut: '17:00' }
+    'A':  { shiftIn: '06:00', shiftOut: '14:00', deductLunch: false },
+    'B':  { shiftIn: '14:00', shiftOut: '22:00', deductLunch: false },
+    'C':  { shiftIn: '22:00', shiftOut: '06:00', deductLunch: false },
+    'W1': { shiftIn: '08:30', shiftOut: '17:30', deductLunch: true },
+    'G':  { shiftIn: '08:00', shiftOut: '17:00', deductLunch: true }
 };
 
 /**
@@ -66,7 +65,7 @@ let SHIFT_DEFINITIONS = { ...DEFAULT_SHIFT_DEFINITIONS };
  * {
  *   date, sp_no, name, vendor_name, workorder_no, dept_name, section,
  *   skill, designation, shiftsAllowed[], shift, shiftIn, shiftOut,
- *   punchIn, punchOut, dutyIn, dutyOut, addLunch,
+ *   punchIn, punchOut, dutyIn, dutyOut,
  *   dutyHours, otHours, totalHours, inOT, outOT
  * }
  */
@@ -90,7 +89,6 @@ const COLUMN_DEFS = [
     { id: 'TOTAL_HRS',     label: 'TOTAL HRS',      defaultVisible: true },
     { id: 'DUTY_HRS',      label: 'DUTY HRS',       defaultVisible: true },
     { id: 'OT_HRS',        label: 'OT HRS',         defaultVisible: true },
-    { id: 'ADD_LUNCH',     label: 'Allow LUNCH',    defaultVisible: true },
     { id: 'SHIFTS_ALLOWED',label: 'SHIFTS ALLOWED', defaultVisible: true },
     { id: 'SHIFT',         label: 'SHIFT',          defaultVisible: true },
     { id: 'SHIFT_IN',      label: 'SHIFT IN',       defaultVisible: true },
@@ -244,18 +242,16 @@ function sortArrowsHtml(col) {
 }
 
 // -----------------------------------------------
-// REPROCESS (called when addLunch checkbox changes)
+// REPROCESS
 // -----------------------------------------------
 
 /**
- * Recalculates hours for all rows in `employeeData` using the current addLunch flag,
+ * Recalculates hours for all rows in `employeeData`,
  * then re-renders the main table.
  */
 function reprocessData() {
     try {
-        const addLunch = addLunchCheckbox ? addLunchCheckbox.checked : false;
         employeeData.forEach(row => {
-            row.addLunch = addLunch;
 
             const punch_in   = row.punchIn;
             const punch_out  = row.punchOut;
@@ -272,7 +268,9 @@ function reprocessData() {
 
                 const { dutyInMins, dutyOutMins } = calculateHours(punch_in, punch_out, shiftIn, shiftOut, inOtAllowed, outOtAllowed);
 
-                const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, row.shift, addLunch);
+                const shiftDef = SHIFT_DEFINITIONS[row.shift];
+                const deductLunch = shiftDef ? shiftDef.deductLunch : false;
+                const dutyHours  = calculateDutyHours(dutyInMins, dutyOutMins, shiftInMins, shiftOutMins, row.shift, deductLunch);
                 const otHours    = calculateOtHours(employeeId, shiftInMins, shiftOutMins, dutyInMins, dutyOutMins);
                 const totalHours = parseFloat((dutyHours + otHours).toFixed(2));
 
@@ -333,7 +331,6 @@ window.addEventListener('load', () => {
         });
     }
     if (searchInput)        searchInput.addEventListener('input',  renderTable);
-    if (addLunchCheckbox)   addLunchCheckbox.addEventListener('change', reprocessData);
     if (masterFileBtn && masterFileInput) {
         masterFileBtn.addEventListener('click', () => masterFileInput.click());
     }
