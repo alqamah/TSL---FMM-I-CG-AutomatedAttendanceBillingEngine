@@ -48,6 +48,24 @@ async function handlePipoFileSelect(event) {
 // C-SHIFT CROSS-DATE RESOLUTION (shared)
 // -----------------------------------------------
 
+/**
+ * Formats an Excel numeric time or string to a preserved HH:MM:SS (or HH:MM) format.
+ */
+function _formatRawTime(val) {
+    if (val === '' || val === null || val === undefined) return '';
+    if (typeof val === 'number') {
+        const totalSeconds = Math.round((val % 1) * 86400);
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+        if (s > 0) {
+            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+    return String(val).trim();
+}
+
 const C_SHIFT_THRESHOLD_MINS = 20 * 60; // 20:00 — evening punch-in signals C-shift
 
 // Shared row helpers
