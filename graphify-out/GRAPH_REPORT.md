@@ -1,12 +1,12 @@
 # Graph Report - TSL---FMM-I-CG-workingHoursCalc  (2026-05-07)
 
 ## Corpus Check
-- 5 files · ~16,308 words
+- 5 files · ~16,320 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 52 nodes · 91 edges · 8 communities detected
-- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 14 edges (avg confidence: 0.8)
+- 52 nodes · 90 edges · 8 communities detected
+- Extraction: 84% EXTRACTED · 16% INFERRED · 0% AMBIGUOUS · INFERRED: 14 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -29,7 +29,7 @@
 7. `_getActiveShiftDefinitions()` - 4 edges
 8. `_getNearestDefaultShift()` - 4 edges
 9. `handlePipoFileSelect()` - 4 edges
-10. `handlePresenteeFileSelect()` - 4 edges
+10. `formatMinutesTo24h()` - 3 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `calculateDutyHours()` --calls--> `_recalculateEmployeeRow()`  [INFERRED]
@@ -46,8 +46,8 @@
 ## Communities
 
 ### Community 0 - "Community 0"
-Cohesion: 0.33
-Nodes (7): normalizeDate(), _finalizePipoProcessing(), handlePipoFileSelect(), handlePresenteeFileSelect(), processPipoFile(), processPresenteeFile(), _resolveCShiftCrossDate()
+Cohesion: 0.31
+Nodes (6): normalizeDate(), _finalizePipoProcessing(), handlePipoFileSelect(), handlePresenteeFileSelect(), processPipoFile(), processPresenteeFile()
 
 ### Community 1 - "Community 1"
 Cohesion: 0.43
@@ -85,7 +85,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `_recalculateEmployeeRow()` connect `Community 3` to `Community 0`, `Community 6`?**
   _High betweenness centrality (0.341) - this node is a cross-community bridge._
 - **Why does `handlePresenteeFileSelect()` connect `Community 0` to `Community 2`?**
-  _High betweenness centrality (0.276) - this node is a cross-community bridge._
+  _High betweenness centrality (0.269) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `parseTimeFormatToMinutes()` (e.g. with `_excelTimeToHHMM()` and `_recalculateEmployeeRow()`) actually correct?**
   _`parseTimeFormatToMinutes()` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 6 inferred relationships involving `_recalculateEmployeeRow()` (e.g. with `assignShift()` and `parseTimeFormatToMinutes()`) actually correct?**
