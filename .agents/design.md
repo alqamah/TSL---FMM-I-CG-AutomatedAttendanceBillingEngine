@@ -1,19 +1,5 @@
 # Design System Master File
 
-> **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
-> If that file exists, its rules **override** this Master file.
-> If not, strictly follow the rules below.
->
-> **AGENT REFERENCE:** For logic related to the calculation of duty hours, overtime, and shift times, refer to `design-system/working-hours-calculator/hours-logic.md`.
-
----
-
-**Project:** Working Hours Calculator
-**Generated:** 2026-03-05 06:46:05
-**Category:** Bakery/Cafe
-
----
-
 ## Global Rules
 
 ### Color Palette
