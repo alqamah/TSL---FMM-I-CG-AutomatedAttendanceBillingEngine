@@ -513,8 +513,9 @@ async function processPresenteeFile(file) {
                 const inMins  = parseTimeFormatToMinutes(inTimeRaw);
                 const outMins = parseTimeFormatToMinutes(outTimeRaw);
 
-                const inTime   = inMins  !== null ? formatMinutesTo24h(inMins)  : inTimeRaw;
-                const outTime  = outMins !== null ? formatMinutesTo24h(outMins) : outTimeRaw;
+                // Keep original raw time (may include HH:MM:SS) for display
+                const inTime   = inTimeRaw  || (inMins  !== null ? formatMinutesTo24h(inMins)  : '');
+                const outTime  = outTimeRaw || (outMins !== null ? formatMinutesTo24h(outMins) : '');
 
                 const employeeId = String(row['Safety Pass No'] || '').trim();
                 const addLunch   = addLunchCheckbox ? addLunchCheckbox.checked : false;
