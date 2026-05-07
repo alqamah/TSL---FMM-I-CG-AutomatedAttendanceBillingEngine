@@ -1,0 +1,2 @@
+refactored the code in branch of version 1
+The script file was split into different functions

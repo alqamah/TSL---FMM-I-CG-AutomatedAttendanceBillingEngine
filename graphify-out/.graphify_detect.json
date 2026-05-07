@@ -1,0 +1,52 @@
+{
+  "files": {
+    "code": [
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\src\\hoursProcessing.js",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\src\\main.js",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\src\\masterFileUpload.js",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\src\\persistent_data.js",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\src\\renderTable.js",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\src\\uploadProcessFiles.js"
+    ],
+    "document": [
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\index.html",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\readme.md",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\repoingest.txt",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\shift_def.txt",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\todo.txt",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\graphify-out\\converted\\masterSheet_format_ea871070.md",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\graphify-out\\converted\\becoSkillList_ef4a98b8.md",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\graphify-out\\converted\\EMP_DEETS_d17d1c2d.md",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\graphify-out\\converted\\master_21ea85a0.md",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\data\\pd.txt",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\design-system\\working-hours-calculator\\MASTER.md",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\ppt\\ppt.html",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\src\\index.html",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\graphify-out\\converted\\ARC ATTENDANCE FEB-26_61d5f6cd.md",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\graphify-out\\converted\\master_69682dea.md",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\graphify-out\\converted\\2nd april_101d28b0.md",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\graphify-out\\converted\\4th april_026e6aaf.md",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\graphify-out\\converted\\PIPO2_sample_4434fd8d.md",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\graphify-out\\converted\\pipo_sample1_fdeab5c7.md"
+    ],
+    "paper": [
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\ppt\\CLM Attendance Reconciliation Tool (1).pdf"
+    ],
+    "image": [
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\assets\\1.png",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\assets\\2.png",
+      "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\assets\\logo2.svg"
+    ],
+    "video": []
+  },
+  "total_files": 29,
+  "total_words": 56247,
+  "needs_graph": true,
+  "warning": null,
+  "skipped_sensitive": [
+    "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\test\\clm-pipo\\1st april.xlsx [office conversion failed - pip install graphifyy[office]]",
+    "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\test\\clm-pipo\\3rd april.xlsx [office conversion failed - pip install graphifyy[office]]",
+    "D:\\TSL\\WorkingHoursCalc-FMMInfraCG\\TSL---FMM-I-CG-workingHoursCalc\\test\\clm-pipo\\5th april.xlsx [office conversion failed - pip install graphifyy[office]]"
+  ],
+  "graphifyignore_patterns": 0
+}
