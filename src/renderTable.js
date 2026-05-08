@@ -85,7 +85,14 @@ function renderTable() {
 
         const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
+        let masterSpNos = null;
+        if (strictMasterMode) {
+            masterSpNos = new Set(masterEmployeeDetails.map(e => e.sp_no));
+        }
+
         const filteredData = employeeData.filter(row => {
+            if (strictMasterMode && !masterSpNos.has(row.sp_no)) return false;
+            
             if (!query) return true;
             const searchStr = `${row.sp_no} ${row.name} ${row.vendor_name} ${row.shift}`.toLowerCase();
             return searchStr.includes(query);
@@ -232,8 +239,15 @@ function getEmployeeAggregatedData() {
     try {
         if (employeeData.length === 0) return [];
 
+        let masterSpNos = null;
+        if (strictMasterMode) {
+            masterSpNos = new Set(masterEmployeeDetails.map(e => e.sp_no));
+        }
+
         const aggregated = {};
         employeeData.forEach(row => {
+            if (strictMasterMode && !masterSpNos.has(row.sp_no)) return;
+
             let empId = row.sp_no;
             if (!empId) return;
             empId = String(empId).trim();
@@ -270,8 +284,14 @@ function getSkillAggregatedData() {
     try {
         if (employeeData.length === 0) return [];
 
+        let masterSpNos = null;
+        if (strictMasterMode) {
+            masterSpNos = new Set(masterEmployeeDetails.map(e => e.sp_no));
+        }
+
         const aggregated = {};
         employeeData.forEach(row => {
+            if (strictMasterMode && !masterSpNos.has(row.sp_no)) return;
             if (!row.sp_no) return;
             const skill = String(row.skill || 'UNKNOWN').toUpperCase();
             aggregated[skill] = (aggregated[skill] || 0) + (parseFloat(row.totalHours) || 0);
@@ -330,9 +350,15 @@ function exportToExcel() {
     try {
         if (employeeData.length === 0) return;
 
+        let exportData = employeeData;
+        if (strictMasterMode) {
+            const masterSpNos = new Set(masterEmployeeDetails.map(e => e.sp_no));
+            exportData = employeeData.filter(row => masterSpNos.has(row.sp_no));
+        }
+
         const workbook = XLSX.utils.book_new();
 
-        const ws1 = XLSX.utils.json_to_sheet(employeeData);
+        const ws1 = XLSX.utils.json_to_sheet(exportData);
         XLSX.utils.book_append_sheet(workbook, ws1, 'AttendanceData');
 
         const empData = getEmployeeAggregatedData();

@@ -23,6 +23,7 @@ const masterFileInput             = document.getElementById('masterFileInput');
 const btnEmployeeTotal            = document.getElementById('btnEmployeeTotal');
 const btnSkillTotal               = document.getElementById('btnSkillTotal');
 const btnExitAggregate            = document.getElementById('btnExitAggregate');
+const btnSourceMaster             = document.getElementById('btnSourceMaster');
 
 // -----------------------------------------------
 // SHARED STATE
@@ -30,6 +31,9 @@ const btnExitAggregate            = document.getElementById('btnExitAggregate');
 
 /** Flag: true after a master file has been successfully parsed & loaded. */
 let masterFileUploaded = false;
+
+/** Flag: true if we should only display records present in the master sheet. */
+let strictMasterMode = false;
 
 /**
  * Master-sheet employee details, populated by handleMasterFileUpload().
@@ -344,6 +348,17 @@ window.addEventListener('load', () => {
     if (btnEmployeeTotal)   btnEmployeeTotal.addEventListener('click', employeewiseTotalHours);
     if (btnSkillTotal)      btnSkillTotal.addEventListener('click', skillwiseTotalHours);
     if (btnExitAggregate)   btnExitAggregate.addEventListener('click', reprocessData);
+    if (btnSourceMaster) {
+        btnSourceMaster.addEventListener('click', () => {
+            strictMasterMode = !strictMasterMode;
+            if (strictMasterMode) {
+                btnSourceMaster.classList.add('active');
+            } else {
+                btnSourceMaster.classList.remove('active');
+            }
+            renderTable();
+        });
+    }
 
     // Bypass checkbox toggles CLM upload availability
     if (bypassMasterFileCheckbox) {

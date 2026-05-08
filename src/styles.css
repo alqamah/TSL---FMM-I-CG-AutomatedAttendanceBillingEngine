@@ -378,6 +378,12 @@ button:disabled {
     background: var(--bg-muted);
 }
 
+.stat-button.toggle-button.active {
+    background: var(--primary-color);
+    color: #ffffff;
+    border-color: var(--primary-color);
+}
+
 .master-file-badge {
     display: inline-flex;
     align-items: center;

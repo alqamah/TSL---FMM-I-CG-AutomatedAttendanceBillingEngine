@@ -1,7 +1,7 @@
-# Graph Report - TSL---FMM-I-CG-workingHoursCalc  (2026-05-07)
+# Graph Report - TSL---FMM-I-CG-workingHoursCalc  (2026-05-08)
 
 ## Corpus Check
-- 5 files · ~16,320 words
+- 5 files · ~16,497 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
