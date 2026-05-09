@@ -699,7 +699,10 @@ async function processPipoFile(file, globalTempMap) {
             // Convert punch time to minutes since midnight
             const toMins = val => {
                 if (val === '' || val === null || val === undefined) return null;
-                if (typeof val === 'number') return Math.round((val % 1) * 1440);
+                if (typeof val === 'number') {
+                    const totalSeconds = Math.round((val % 1) * 86400);
+                    return Math.floor(totalSeconds / 60);
+                }
                 return parseTimeFormatToMinutes(String(val));
             };
 

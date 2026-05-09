@@ -25,7 +25,8 @@ function _excelTimeToHHMM(val) {
     if (typeof val === 'number') {
         // Keep only the fractional part in case a full datetime serial slips through
         const frac = val % 1;
-        const totalMins = Math.round(frac * 1440);
+        const totalSeconds = Math.round(frac * 86400);
+        const totalMins = Math.floor(totalSeconds / 60);
         return formatMinutesTo24h(totalMins);
     }
 
