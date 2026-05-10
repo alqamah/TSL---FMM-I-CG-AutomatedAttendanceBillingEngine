@@ -3,4 +3,5 @@ uploading punch records and presentee report
 deduct-lunch logic added (using shift-definitions from master-sheet and default declarations) 
 cross-punch timing for C shift implemented for Punch-Records only, presentee-report as it is.
 Strict Master Filter (data source: masterSheet) only feature added
+added about page that's linked to readme.md
 `
