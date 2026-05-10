@@ -15,5 +15,22 @@
 ---
 
 **Project:** Working Hours Calculator
-**Generated:** 2026-03-05 06:46:05
-**Category:** Bakery/Cafe
+**Category:** Attendance Reconciliation
+
+## Project Structure
+
+```
+├── src/
+│   ├── index.html              # Main application page
+│   ├── styles.css              # Full design system & styling
+│   ├── main.js                 # App entry: DOM refs, state, column picker, event wiring
+│   ├── hoursProcessing.js      # Time parsing, shift assignment, hours/OT calculation
+│   ├── uploadProcessFiles.js   # Presentee & Punch Record upload handlers
+│   ├── renderTable.js          # Table rendering, aggregation views, Excel export
+│   └── masterFileUpload.js     # Master sheet upload & parsing
+├── assets/
+│   ├── logo2.svg               # Tata Steel logo
+│   ├── masterSheet_format.xlsx # Downloadable master sheet template
+│   ├── 1.png                   # Presentee upload card icon
+│   └── 2.png                   # Punch Records upload card icon
+```

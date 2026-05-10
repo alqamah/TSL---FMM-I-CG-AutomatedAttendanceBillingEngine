@@ -182,7 +182,7 @@ button:disabled {
 
 .header .header-title:hover {
     color: var(--text-primary);
-    cursor: pointer;
+    cursor: default;
 }
 
 .header .header-subtitle {

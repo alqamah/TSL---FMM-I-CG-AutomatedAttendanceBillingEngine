@@ -1,6 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - Working Hours Calculator</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="about-styles.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="logo-group" onclick="window.location.href='index.html'">
+                <img src="../assets/logo2.svg" alt="Tata Steel logo" class="app-logo">
+                <p class="header-subtitle">FMM-INFRA, Crane Group</p>
+            </div>
+            <h1 class="header-title">About / Documentation</h1>
+            <div class="header-actions">
+                <a href="index.html" class="ctrl-btn">
+                    <svg aria-hidden="true" focusable="false" width="16" height="16" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="19" y1="12" x2="5" y2="12"></line>
+                        <polyline points="12 19 5 12 12 5"></polyline>
+                    </svg>
+                    Back to App
+                </a>
+            </div>
+        </header>
+
+        <main class="main-content" id="mainContent">
+            <div class="markdown-container" id="markdownContainer">
+                <div class="loading-state">Loading documentation...</div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="footer-content">
+                <svg aria-hidden="true" focusable="false" stroke="currentColor" fill="none" stroke-width="2"
+                    viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="footer-icon">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
+                <span class="footer-email">alqama.hasnain@tatasteel.com</span>
+                <span class="footer-brand">FMM-INFRA</span>
+            </div>
+        </footer>
+    </div>
+
+    <script type="text/markdown" id="md-content">
 # CLM Attendance Reconciliation Tool
 
-> **Tata Steel — FMM-Infrastructure**
+> **alqama.hasnain@tatasteel.com, Tata Steel — FMM-Infrastructure**
 
 A browser-based attendance reconciliation engine that transforms raw CLM (Contract Labour Management) portal data into accurate, shift-aware working-hours reports — complete with overtime calculations, skill-wise aggregations, and one-click Excel export.
 
@@ -43,7 +98,7 @@ An optional but recommended first step. Upload a Master Excel Sheet (`.xlsx`) co
 | :--- | :--- |
 | Shift Name | Shift code (e.g., `A`, `B`, `C`, `G`, `W1`) |
 | In | Shift start time (e.g., 08:30 as `HH:MM 24h`) |
-| Out | Shift end time (e.g., 17:30 as `HH:MM 24h`)|
+| Out | Shift end time (e.g., 17:30 as `HH:MM 24h`) |
 | Lunch Deduction | Whether lunch deduction is applicable (`Yes`/`No`) |
 
 * If Sheet 2 is absent, the tool falls back to the **default shift definitions** (see below).
@@ -249,3 +304,18 @@ These defaults are overridden if a master sheet with a `shift_definitions` sheet
 
 📧 alqama.hasnain@tatasteel.com  
 **FMM-INFRA, Crane Group — Tata Steel**
+    </script>
+
+    <script>
+        try {
+            const text = document.getElementById('md-content').textContent;
+            const container = document.getElementById('markdownContainer');
+            container.innerHTML = marked.parse(text);
+        } catch (error) {
+            const container = document.getElementById('markdownContainer');
+            container.innerHTML = `<div class="error-state">Failed to load documentation: ${error.message}</div>`;
+        }
+    </script>
+</body>
+
+</html>
