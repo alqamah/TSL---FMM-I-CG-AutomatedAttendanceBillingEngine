@@ -4,4 +4,5 @@ deduct-lunch logic added (using shift-definitions from master-sheet and default 
 cross-punch timing for C shift implemented for Punch-Records only, presentee-report as it is.
 Strict Master Filter (data source: masterSheet) only feature added
 added about page that's linked to readme.md
+updated custom-shift out-punch logic (changed EARLY_C_SHIFT_IN_THRESHOLD = 16:00)
 `

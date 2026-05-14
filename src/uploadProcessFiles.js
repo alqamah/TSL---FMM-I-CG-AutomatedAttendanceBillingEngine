@@ -111,7 +111,7 @@ function _finalizePipoProcessing(globalTempMap) {
     };
 
     const C_SHIFT_IN_THRESHOLD       = 20 * 60;  // 20:00 = 1200 min - evening IN signals C-shift
-    const EARLY_C_SHIFT_IN_THRESHOLD = 18 * 60;  // C-shift can be punched early before 20:00
+    const EARLY_C_SHIFT_IN_THRESHOLD = 16 * 60;  // C-shift can be punched early before 20:00 (lowered to 16:00 for shifts like C1)
     const MORNING_OUT_CUTOFF         = 12 * 60;  // 12:00 = 720 min - morning OUT belongs to prev C-shift
 
     // Group per-date records by employee for cross-date resolution
@@ -129,6 +129,7 @@ function _finalizePipoProcessing(globalTempMap) {
 
         // Track the IN punch already used to create each C-shift row.
         const cPunchInsByGroup = new Map();
+        const cOutsByGroup = new Map();
 
         // First pass: identify C-shift entries and consume next-date morning OUTs
         groups.forEach((group, idx) => {
@@ -152,15 +153,21 @@ function _finalizePipoProcessing(globalTempMap) {
                 let punchOutMins = null;
                 cPunchInsByGroup.set(idx, new Set(eveningIns));
 
+                const laterSameDateOuts = group.outTimes.filter(m => m >= MORNING_OUT_CUTOFF && m > punchInMins);
+
                 // Look for morning OUT on the NEXT date for this employee
                 if (nextDateMorningOuts.length > 0) {
                     punchOutMins = Math.max(...nextDateMorningOuts);
+                } else if (laterSameDateOuts.length > 0) {
+                    punchOutMins = Math.max(...laterSameDateOuts);
+                    if (!cOutsByGroup.has(idx)) cOutsByGroup.set(idx, new Set());
+                    cOutsByGroup.get(idx).add(punchOutMins);
                 }
 
                 pipoEmployeeDetails.push({
                     date: group.date, sp_no: group.sp_no,
                     punchInMins, punchOutMins,
-                    punchOutNextDate: (punchOutMins !== null && nextGroup) ? nextGroup.date : null,
+                    punchOutNextDate: (punchOutMins !== null && nextGroup && nextDateMorningOuts.length > 0) ? nextGroup.date : null,
                     vendorName: group.vendor_name, workorderNo: group.workorder_no,
                     workmanName: group.workman_name, deptName: group.dept_name
                 });
@@ -175,6 +182,10 @@ function _finalizePipoProcessing(globalTempMap) {
             // Morning OUTs are C-shift exits, either already consumed by the previous
             // date's C row or belonging to a previous upload not present here.
             let availableOuts = group.outTimes.filter(m => m >= MORNING_OUT_CUTOFF);
+            const cOuts = cOutsByGroup.get(idx);
+            if (cOuts) {
+                availableOuts = availableOuts.filter(m => !cOuts.has(m));
+            }
 
             // If no daytime IN and no available OUT, skip this day
             if (regularIns.length === 0 && availableOuts.length === 0) return;
