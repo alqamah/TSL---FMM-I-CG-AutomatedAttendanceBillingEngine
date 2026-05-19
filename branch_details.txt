@@ -5,4 +5,6 @@ cross-punch timing for C shift implemented for Punch-Records only, presentee-rep
 Strict Master Filter (data source: masterSheet) only feature added
 added about page that's linked to readme.md
 updated custom-shift out-punch logic (changed EARLY_C_SHIFT_IN_THRESHOLD = 16:00)
+
+branch v3 working GOOD -> merged to 'main'
 `
